@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Momentum AI - Interaktiv 3D Workshop</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #0a0e1a; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+        #renderer { width: 100vw; height: 100vh; display: block; }
+
+        /* Loading screen */
+        #loading {
+            position: fixed; inset: 0; z-index: 1000;
+            background: #0a0e1a;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s;
+        }
+        #loading.hidden { opacity: 0; pointer-events: none; }
+        #loading h1 { color: #00b4ff; font-size: 2.4rem; margin-bottom: 0.5rem; letter-spacing: 2px; }
+        #loading p { color: #7eb8da; font-size: 1.1rem; margin-bottom: 2rem; }
+        .loader-bar { width: 200px; height: 3px; background: #1a2440; border-radius: 3px; overflow: hidden; }
+        .loader-bar-inner { width: 0%; height: 100%; background: linear-gradient(90deg, #00b4ff, #00e0ff); border-radius: 3px; transition: width 0.3s; }
+
+        /* Start overlay */
+        #start-overlay {
+            position: fixed; inset: 0; z-index: 900;
+            background: rgba(10, 14, 26, 0.92);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: opacity 0.5s;
+        }
+        #start-overlay.hidden { opacity: 0; pointer-events: none; }
+        #start-overlay h2 {
+            color: #00b4ff; font-size: 2rem; margin-bottom: 1rem;
+            text-shadow: 0 0 30px rgba(0,180,255,0.5);
+        }
+        #start-overlay .subtitle { color: #a0c4e0; font-size: 1.1rem; margin-bottom: 2rem; max-width: 500px; text-align: center; line-height: 1.6; }
+        #start-overlay .start-btn {
+            padding: 16px 48px; border: 2px solid #00b4ff; background: rgba(0,180,255,0.1);
+            color: #00e0ff; font-size: 1.2rem; border-radius: 8px; cursor: pointer;
+            transition: all 0.3s; letter-spacing: 1px;
+        }
+        #start-overlay .start-btn:hover { background: rgba(0,180,255,0.25); transform: scale(1.05); }
+        .controls-hint {
+            margin-top: 2rem; color: #5a8aaa; font-size: 0.85rem; text-align: center; line-height: 1.8;
+        }
+        .controls-hint kbd {
+            display: inline-block; padding: 2px 8px; background: rgba(0,180,255,0.15);
+            border: 1px solid #1a3a5a; border-radius: 4px; color: #7ec8e8; font-family: monospace;
+        }
+
+        /* HUD */
+        #hud {
+            position: fixed; top: 20px; left: 20px; z-index: 100;
+            color: #5a8aaa; font-size: 0.8rem; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        #hud.hidden { opacity: 0; }
+
+        /* Crosshair */
+        #crosshair {
+            position: fixed; top: 50%; left: 50%; z-index: 100;
+            width: 20px; height: 20px; transform: translate(-50%, -50%);
+            pointer-events: none; opacity: 0; transition: opacity 0.3s;
+        }
+        #crosshair.visible { opacity: 1; }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: rgba(0,200,255,0.6);
+        }
+        #crosshair::before { width: 2px; height: 20px; left: 9px; top: 0; }
+        #crosshair::after { width: 20px; height: 2px; left: 0; top: 9px; }
+        #crosshair.active::before, #crosshair.active::after { background: #00e0ff; }
+
+        /* Interaction prompt */
+        #interact-prompt {
+            position: fixed; bottom: 15%; left: 50%; transform: translateX(-50%);
+            z-index: 100; color: #00e0ff; font-size: 1rem;
+            background: rgba(0,20,40,0.8); padding: 10px 24px; border-radius: 8px;
+            border: 1px solid rgba(0,180,255,0.3); pointer-events: none;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        #interact-prompt.visible { opacity: 1; }
+
+        /* Info panel */
+        #info-panel {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 200; max-width: 700px; width: 90%;
+            background: rgba(8, 16, 32, 0.96);
+            border: 1px solid rgba(0, 180, 255, 0.4);
+            border-radius: 16px; padding: 40px;
+            box-shadow: 0 0 60px rgba(0,180,255,0.15), inset 0 0 60px rgba(0,20,40,0.5);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.4s, transform 0.4s;
+            max-height: 80vh; overflow-y: auto;
+        }
+        #info-panel.visible { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+        #info-panel .panel-tag {
+            display: inline-block; padding: 4px 12px; background: rgba(0,180,255,0.15);
+            border: 1px solid rgba(0,180,255,0.3); border-radius: 20px;
+            color: #00b4ff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px;
+            margin-bottom: 16px;
+        }
+        #info-panel h2 {
+            color: #00e0ff; font-size: 1.6rem; margin-bottom: 16px;
+            text-shadow: 0 0 20px rgba(0,180,255,0.3);
+        }
+        #info-panel .panel-content {
+            color: #b0d0e8; font-size: 0.95rem; line-height: 1.8;
+        }
+        #info-panel .panel-content strong { color: #00e0ff; }
+        #info-panel .panel-content ul { margin: 12px 0; padding-left: 20px; }
+        #info-panel .panel-content li { margin-bottom: 8px; }
+        #info-panel .close-btn {
+            position: absolute; top: 16px; right: 20px;
+            background: none; border: 1px solid rgba(0,180,255,0.3);
+            color: #5a8aaa; width: 32px; height: 32px; border-radius: 50%;
+            cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s;
+        }
+        #info-panel .close-btn:hover { color: #00e0ff; border-color: #00b4ff; }
+
+        /* Minimap */
+        #minimap {
+            position: fixed; bottom: 20px; right: 20px; z-index: 100;
+            width: 150px; height: 150px;
+            background: rgba(8,16,32,0.85);
+            border: 1px solid rgba(0,180,255,0.3);
+            border-radius: 8px; overflow: hidden;
+        }
+        #minimap canvas { width: 100%; height: 100%; }
+
+        /* Scrollbar for info panel */
+        #info-panel::-webkit-scrollbar { width: 6px; }
+        #info-panel::-webkit-scrollbar-track { background: rgba(0,20,40,0.5); }
+        #info-panel::-webkit-scrollbar-thumb { background: rgba(0,180,255,0.3); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading">
+    <h1>MOMENTUM AI</h1>
+    <p>Indlæser 3D Workshop...</p>
+    <div class="loader-bar"><div class="loader-bar-inner" id="loader-progress"></div></div>
+</div>
+
+<!-- Start Overlay -->
+<div id="start-overlay" class="hidden">
+    <h2>Generativ AI Workshop</h2>
+    <p class="subtitle">
+        Velkommen til Momentum AI's interaktive 3D workshop-lokale i København.
+        Udforsk lokalet og lær om generativ AI ved at besøge de forskellige stationer.
+    </p>
+    <button class="start-btn" id="start-btn">Start Oplevelsen</button>
+    <div class="controls-hint">
+        <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> for at bevæge dig &nbsp;|&nbsp;
+        <kbd>Mus</kbd> for at se dig omkring<br>
+        <kbd>Klik</kbd> på stationer for at lære mere &nbsp;|&nbsp;
+        <kbd>ESC</kbd> for at frigøre musen
+    </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+    <div>WASD - Bevæg &nbsp;|&nbsp; Mus - Se rundt &nbsp;|&nbsp; Klik - Interager &nbsp;|&nbsp; ESC - Pause</div>
+</div>
+
+<!-- Crosshair -->
+<div id="crosshair"></div>
+
+<!-- Interaction Prompt -->
+<div id="interact-prompt">Klik for at læse mere</div>
+
+<!-- Info Panel -->
+<div id="info-panel">
+    <button class="close-btn" id="close-panel">&times;</button>
+    <div class="panel-tag" id="panel-tag">Station</div>
+    <h2 id="panel-title">Titel</h2>
+    <div class="panel-content" id="panel-content"></div>
+</div>
+
+<!-- Minimap -->
+<div id="minimap">
+    <canvas id="minimap-canvas" width="150" height="150"></canvas>
+</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================
+// STATION CONTENT
+// ============================
+const stationData = [
+    {
+        id: 'what-is-genai',
+        tag: 'Station 1',
+        title: 'Hvad er Generativ AI?',
+        content: `
+            <p><strong>Generativ AI</strong> er en type kunstig intelligens der kan skabe nyt indhold – tekst, billeder, kode, musik og meget mere.</p>
+            <p>I modsætning til traditionel AI, der analyserer og klassificerer data, kan generativ AI <strong>producere helt nyt materiale</strong> baseret på mønstre den har lært fra enorme datasæt.</p>
+            <ul>
+                <li><strong>Store sprogmodeller (LLMs)</strong> som GPT-4 og Claude kan generere menneskelignende tekst</li>
+                <li><strong>Billedgeneratorer</strong> som DALL-E og Midjourney skaber billeder fra tekstbeskrivelser</li>
+                <li><strong>Kodegeneratorer</strong> som GitHub Copilot hjælper udviklere med at skrive kode</li>
+            </ul>
+            <p>Teknologien bygger på <strong>transformer-arkitekturen</strong> fra 2017, som revolutionerede hvordan AI forstår og genererer sprog.</p>
+        `,
+        position: { x: -8, z: -6 },
+        color: 0x00b4ff
+    },
+    {
+        id: 'chatgpt',
+        tag: 'Station 2',
+        title: 'ChatGPT i Erhvervslivet',
+        content: `
+            <p><strong>ChatGPT</strong> ændrer fundamentalt måden vi arbejder på i erhvervslivet. Sprogmodeller rummer et enormt potentiale for at effektivisere arbejdsprocesser.</p>
+            <ul>
+                <li><strong>Tekstproduktion:</strong> Udkast til e-mails, rapporter, præsentationer og markedsføringsmateriale</li>
+                <li><strong>Analyse:</strong> Sammenfatning af lange dokumenter, markedsanalyser og datafortolkning</li>
+                <li><strong>Kreativitet:</strong> Brainstorming, idéudvikling og konceptgenerering</li>
+                <li><strong>Kundeservice:</strong> Automatiserede svar, FAQ-håndtering og chat-support</li>
+                <li><strong>Oversættelse:</strong> Hurtig og kontekstbevidst oversættelse af forretningsdokumenter</li>
+            </ul>
+            <p>Virksomheder der integrerer AI i deres arbejdsgange kan opnå <strong>betydelige produktivitetsforbedringer</strong> på tværs af afdelinger.</p>
+        `,
+        position: { x: 8, z: -6 },
+        color: 0x00e0ff
+    },
+    {
+        id: 'prompt-engineering',
+        tag: 'Station 3',
+        title: 'Prompt Engineering',
+        content: `
+            <p><strong>Prompt Engineering</strong> er kunsten at formulere effektive instruktioner til AI-modeller for at få de bedste resultater.</p>
+            <p>En god prompt kan gøre forskellen mellem et middelmådigt og et fremragende svar:</p>
+            <ul>
+                <li><strong>Vær specifik:</strong> Jo mere kontekst og detaljer du giver, jo bedre bliver svaret</li>
+                <li><strong>Definer rollen:</strong> Bed AI'en om at agere som ekspert inden for et specifikt område</li>
+                <li><strong>Giv eksempler:</strong> Few-shot prompting med eksempler forbedrer output markant</li>
+                <li><strong>Iterér:</strong> Forfin dine prompts baseret på de svar du modtager</li>
+                <li><strong>Brug systemprompter:</strong> Sæt rammer og retningslinjer for samtalen</li>
+            </ul>
+            <p>Effektiv prompt engineering er ved at blive en <strong>kernekompetence</strong> i den moderne arbejdsplads.</p>
+        `,
+        position: { x: -8, z: 6 },
+        color: 0x4dc9f6
+    },
+    {
+        id: 'copilot',
+        tag: 'Station 4',
+        title: 'Microsoft Copilot',
+        content: `
+            <p><strong>Microsoft Copilot</strong> er din personlige AI-assistent integreret direkte i de Microsoft-værktøjer du allerede bruger.</p>
+            <ul>
+                <li><strong>Word:</strong> Generér udkast, omskriv tekst, og lav sammenfatninger af dokumenter</li>
+                <li><strong>Excel:</strong> Analysér data, opret formler, og generer diagrammer med naturligt sprog</li>
+                <li><strong>PowerPoint:</strong> Skab præsentationer fra tekst eller dokumenter automatisk</li>
+                <li><strong>Outlook:</strong> Opsummer e-mail-tråde og udarbejd svar</li>
+                <li><strong>Teams:</strong> Få mødereferat, opsummeringer og handlingspunkter automatisk</li>
+            </ul>
+            <p>Copilot repræsenterer et <strong>paradigmeskift</strong> i hvordan vi interagerer med kontorsoftware – fra menuer og knapper til naturlig samtale.</p>
+        `,
+        position: { x: 8, z: 6 },
+        color: 0x0078d4
+    },
+    {
+        id: 'eu-ai-act',
+        tag: 'Station 5',
+        title: 'EU AI-forordningen',
+        content: `
+            <p><strong>EU's AI Act</strong> er verdens første omfattende lovgivning om kunstig intelligens, og den påvirker alle virksomheder der bruger AI.</p>
+            <p>Forordningen inddeler AI-systemer i <strong>risikokategorier</strong>:</p>
+            <ul>
+                <li><strong>Uacceptabel risiko:</strong> Forbudte systemer – fx social scoring og manipulerende AI</li>
+                <li><strong>Høj risiko:</strong> Strenge krav – fx AI i ansættelse, kredit og sundhed</li>
+                <li><strong>Begrænset risiko:</strong> Gennemsigtighedskrav – fx chatbots skal identificere sig som AI</li>
+                <li><strong>Minimal risiko:</strong> Ingen specifikke krav – fx spamfiltre og AI i spil</li>
+            </ul>
+            <p>Virksomheder skal sikre <strong>compliance</strong> med de nye regler, herunder dokumentation, risikovurdering og menneskeligt tilsyn med AI-systemer.</p>
+        `,
+        position: { x: 0, z: -8 },
+        color: 0x003399
+    },
+    {
+        id: 'future',
+        tag: 'Station 6',
+        title: 'Fremtiden med AI',
+        content: `
+            <p><strong>AI-udviklingen accelererer</strong> med hastige skridt, og de næste år vil bringe endnu mere transformerende teknologi.</p>
+            <ul>
+                <li><strong>Multimodale modeller:</strong> AI der forstår og kombinerer tekst, billeder, lyd og video</li>
+                <li><strong>AI-agenter:</strong> Autonome systemer der kan udføre komplekse opgaver selvstændigt</li>
+                <li><strong>Personaliseret AI:</strong> Skræddersyede modeller tilpasset din virksomheds behov og data</li>
+                <li><strong>Edge AI:</strong> Kraftfuld AI der kører lokalt på enheder uden cloud-afhængighed</li>
+                <li><strong>Ansvarlig AI:</strong> Øget fokus på etik, bias-reduktion og gennemsigtighed</li>
+            </ul>
+            <p>Nøglen til succes er at <strong>starte nu</strong> – forstå teknologien, eksperimentér, og byg kompetencer inden AI omformer din branche.</p>
+        `,
+        position: { x: 0, z: 8 },
+        color: 0x00ffc8
+    }
+];
+
+// ============================
+// THREE.JS SCENE SETUP
+// ============================
+let camera, scene, renderer, clock;
+let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+let isLocked = false, panelOpen = false;
+let velocity = new THREE.Vector3();
+let direction = new THREE.Vector3();
+let euler = new THREE.Euler(0, 0, 0, 'YXZ');
+let interactiveObjects = [];
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2(0, 0);
+let currentHovered = null;
+let playerHeight = 1.7;
+let minimapCtx;
+
+// DOM elements
+const loadingEl = document.getElementById('loading');
+const loaderProgress = document.getElementById('loader-progress');
+const startOverlay = document.getElementById('start-overlay');
+const startBtn = document.getElementById('start-btn');
+const hudEl = document.getElementById('hud');
+const crosshairEl = document.getElementById('crosshair');
+const interactPrompt = document.getElementById('interact-prompt');
+const infoPanel = document.getElementById('info-panel');
+const panelTag = document.getElementById('panel-tag');
+const panelTitle = document.getElementById('panel-title');
+const panelContent = document.getElementById('panel-content');
+const closePanel = document.getElementById('close-panel');
+const minimapCanvas = document.getElementById('minimap-canvas');
+
+init();
+
+function init() {
+    // Scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0e1a);
+    scene.fog = new THREE.FogExp2(0x0a0e1a, 0.015);
+
+    // Camera
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, playerHeight, 12);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.body.prepend(renderer.domElement);
+
+    clock = new THREE.Clock();
+
+    // Minimap
+    minimapCtx = minimapCanvas.getContext('2d');
+
+    // Build scene
+    simulateLoading(() => {
+        buildRoom();
+        buildFurniture();
+        buildStations();
+        addLighting();
+        addDecorations();
+
+        // Show start overlay
+        loadingEl.classList.add('hidden');
+        startOverlay.classList.remove('hidden');
+    });
+
+    // Events
+    startBtn.addEventListener('click', startExperience);
+    closePanel.addEventListener('click', closeInfoPanel);
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+    document.addEventListener('click', onMouseClick);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('pointerlockchange', onPointerLockChange);
+    window.addEventListener('resize', onResize);
+
+    // Start render loop
+    animate();
+}
+
+function simulateLoading(callback) {
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 15 + 5;
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            loaderProgress.style.width = '100%';
+            setTimeout(callback, 300);
+        } else {
+            loaderProgress.style.width = progress + '%';
+        }
+    }, 120);
+}
+
+// ============================
+// BUILD THE ROOM
+// ============================
+function buildRoom() {
+    const roomWidth = 24;
+    const roomDepth = 24;
+    const roomHeight = 4;
+
+    // Floor
+    const floorGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
+    const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x0d1520,
+        roughness: 0.8,
+        metalness: 0.2
+    });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Floor grid lines
+    const gridHelper = new THREE.GridHelper(roomWidth, 24, 0x0a2040, 0x0a1830);
+    gridHelper.position.y = 0.01;
+    scene.add(gridHelper);
+
+    // Ceiling
+    const ceilGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
+    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x0a1020, roughness: 1, side: THREE.DoubleSide });
+    const ceiling = new THREE.Mesh(ceilGeo, ceilMat);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.y = roomHeight;
+    scene.add(ceiling);
+
+    // Walls
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0d1825, roughness: 0.9, metalness: 0.1 });
+
+    // Back wall
+    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(roomWidth, roomHeight), wallMat);
+    backWall.position.set(0, roomHeight / 2, -roomDepth / 2);
+    backWall.receiveShadow = true;
+    scene.add(backWall);
+
+    // Front wall
+    const frontWall = new THREE.Mesh(new THREE.PlaneGeometry(roomWidth, roomHeight), wallMat);
+    frontWall.position.set(0, roomHeight / 2, roomDepth / 2);
+    frontWall.rotation.y = Math.PI;
+    frontWall.receiveShadow = true;
+    scene.add(frontWall);
+
+    // Left wall
+    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(roomDepth, roomHeight), wallMat);
+    leftWall.position.set(-roomWidth / 2, roomHeight / 2, 0);
+    leftWall.rotation.y = Math.PI / 2;
+    leftWall.receiveShadow = true;
+    scene.add(leftWall);
+
+    // Right wall
+    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(roomDepth, roomHeight), wallMat);
+    rightWall.position.set(roomWidth / 2, roomHeight / 2, 0);
+    rightWall.rotation.y = -Math.PI / 2;
+    rightWall.receiveShadow = true;
+    scene.add(rightWall);
+
+    // Baseboard neon strips
+    addNeonStrip(0, 0.05, -roomDepth / 2 + 0.01, roomWidth, 0.06, 0x00b4ff, 0);
+    addNeonStrip(0, 0.05, roomDepth / 2 - 0.01, roomWidth, 0.06, 0x00b4ff, Math.PI);
+    addNeonStrip(-roomWidth / 2 + 0.01, 0.05, 0, roomDepth, 0.06, 0x00b4ff, Math.PI / 2);
+    addNeonStrip(roomWidth / 2 - 0.01, 0.05, 0, roomDepth, 0.06, 0x00b4ff, -Math.PI / 2);
+
+    // Ceiling light strips
+    for (let i = -1; i <= 1; i += 2) {
+        const stripGeo = new THREE.PlaneGeometry(0.15, roomDepth * 0.8);
+        const stripMat = new THREE.MeshBasicMaterial({ color: 0x1a3050, transparent: true, opacity: 0.6 });
+        const strip = new THREE.Mesh(stripGeo, stripMat);
+        strip.rotation.x = -Math.PI / 2;
+        strip.position.set(i * 4, roomHeight - 0.01, 0);
+        scene.add(strip);
+    }
+}
+
+function addNeonStrip(x, y, z, width, height, color, rotY) {
+    const geo = new THREE.PlaneGeometry(width, height);
+    const mat = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.6
+    });
+    const strip = new THREE.Mesh(geo, mat);
+    strip.position.set(x, y, z);
+    if (rotY) strip.rotation.y = rotY;
+    scene.add(strip);
+}
+
+// ============================
+// FURNITURE
+// ============================
+function buildFurniture() {
+    // Central conference table
+    createTable(0, 0, 0, 4, 2);
+
+    // Chairs around central table
+    const chairPositions = [
+        { x: -1.5, z: -1.3, ry: 0 }, { x: 0, z: -1.3, ry: 0 }, { x: 1.5, z: -1.3, ry: 0 },
+        { x: -1.5, z: 1.3, ry: Math.PI }, { x: 0, z: 1.3, ry: Math.PI }, { x: 1.5, z: 1.3, ry: Math.PI },
+        { x: -2.3, z: 0, ry: Math.PI / 2 }, { x: 2.3, z: 0, ry: -Math.PI / 2 }
+    ];
+    chairPositions.forEach(p => createChair(p.x, p.z, p.ry));
+
+    // Side tables near walls
+    createTable(-8, 0, -2, 2, 1);
+    createTable(-8, 0, 2, 2, 1);
+    createTable(8, 0, -2, 2, 1);
+    createTable(8, 0, 2, 2, 1);
+
+    // Whiteboard on back wall
+    createWhiteboard(0, 2.2, -11.8);
+
+    // Laptops on central table
+    createLaptop(-1, 0.76, -0.3);
+    createLaptop(0.5, 0.76, 0.3, Math.PI);
+    createLaptop(1.5, 0.76, -0.3);
+
+    // Coffee cups
+    createCoffeeCup(-0.3, 0.76, -0.5);
+    createCoffeeCup(1, 0.76, 0.5);
+
+    // Plant pots in corners
+    createPlant(-10, 0, -10);
+    createPlant(10, 0, -10);
+    createPlant(-10, 0, 10);
+    createPlant(10, 0, 10);
+}
+
+function createTable(x, y, z, width, depth) {
+    // Tabletop
+    const topGeo = new THREE.BoxGeometry(width, 0.05, depth);
+    const topMat = new THREE.MeshStandardMaterial({ color: 0x1a2535, roughness: 0.4, metalness: 0.3 });
+    const top = new THREE.Mesh(topGeo, topMat);
+    top.position.set(x, 0.75, z);
+    top.castShadow = true;
+    top.receiveShadow = true;
+    scene.add(top);
+
+    // Edge glow
+    const edgeGeo = new THREE.BoxGeometry(width + 0.04, 0.02, depth + 0.04);
+    const edgeMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.15 });
+    const edge = new THREE.Mesh(edgeGeo, edgeMat);
+    edge.position.set(x, 0.75, z);
+    scene.add(edge);
+
+    // Legs
+    const legGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.74);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, metalness: 0.8, roughness: 0.3 });
+    const offsets = [
+        { dx: -width / 2 + 0.15, dz: -depth / 2 + 0.15 },
+        { dx: width / 2 - 0.15, dz: -depth / 2 + 0.15 },
+        { dx: -width / 2 + 0.15, dz: depth / 2 - 0.15 },
+        { dx: width / 2 - 0.15, dz: depth / 2 - 0.15 }
+    ];
+    offsets.forEach(o => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(x + o.dx, 0.37, z + o.dz);
+        leg.castShadow = true;
+        scene.add(leg);
+    });
+}
+
+function createChair(x, z, rotY) {
+    const group = new THREE.Group();
+
+    // Seat
+    const seatGeo = new THREE.BoxGeometry(0.45, 0.05, 0.45);
+    const seatMat = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.6 });
+    const seat = new THREE.Mesh(seatGeo, seatMat);
+    seat.position.y = 0.45;
+    group.add(seat);
+
+    // Back
+    const backGeo = new THREE.BoxGeometry(0.45, 0.5, 0.05);
+    const back = new THREE.Mesh(backGeo, seatMat);
+    back.position.set(0, 0.72, -0.2);
+    group.add(back);
+
+    // Legs
+    const legGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.44);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, metalness: 0.7 });
+    [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(lx, 0.22, lz);
+        group.add(leg);
+    });
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    scene.add(group);
+}
+
+function createWhiteboard(x, y, z) {
+    // Board
+    const boardGeo = new THREE.BoxGeometry(4, 2, 0.08);
+    const boardMat = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.3 });
+    const board = new THREE.Mesh(boardGeo, boardMat);
+    board.position.set(x, y, z);
+    scene.add(board);
+
+    // Screen surface
+    const screenGeo = new THREE.PlaneGeometry(3.7, 1.7);
+    const screenMat = new THREE.MeshBasicMaterial({ color: 0x0a1825 });
+    const screen = new THREE.Mesh(screenGeo, screenMat);
+    screen.position.set(x, y, z + 0.05);
+    scene.add(screen);
+
+    // Text on whiteboard: "Generativ AI Workshop"
+    const canvas = document.createElement('canvas');
+    canvas.width = 740;
+    canvas.height = 340;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0a1825';
+    ctx.fillRect(0, 0, 740, 340);
+    ctx.fillStyle = '#00b4ff';
+    ctx.font = 'bold 48px Segoe UI, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Generativ AI Workshop', 370, 100);
+    ctx.fillStyle = '#5a8aaa';
+    ctx.font = '28px Segoe UI, system-ui, sans-serif';
+    ctx.fillText('Momentum AI', 370, 160);
+    ctx.fillText('København 2026', 370, 200);
+    ctx.strokeStyle = '#00b4ff22';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 740; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 340); ctx.stroke(); }
+    for (let i = 0; i < 340; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(740, i); ctx.stroke(); }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const textGeo = new THREE.PlaneGeometry(3.7, 1.7);
+    const textMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+    const textMesh = new THREE.Mesh(textGeo, textMat);
+    textMesh.position.set(x, y, z + 0.06);
+    scene.add(textMesh);
+
+    // Frame glow
+    const frameGeo = new THREE.BoxGeometry(4.1, 2.1, 0.02);
+    const frameMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.15 });
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    frame.position.set(x, y, z - 0.02);
+    scene.add(frame);
+}
+
+function createLaptop(x, y, z, rotY = 0) {
+    const group = new THREE.Group();
+
+    // Base
+    const baseGeo = new THREE.BoxGeometry(0.35, 0.02, 0.25);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.8, roughness: 0.2 });
+    group.add(new THREE.Mesh(baseGeo, baseMat));
+
+    // Screen
+    const screenGeo = new THREE.BoxGeometry(0.34, 0.22, 0.01);
+    const screenMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.8, roughness: 0.2 });
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.position.set(0, 0.12, -0.12);
+    screenMesh.rotation.x = -0.3;
+    group.add(screenMesh);
+
+    // Screen glow
+    const glowGeo = new THREE.PlaneGeometry(0.3, 0.18);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.3 });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.set(0, 0.12, -0.115);
+    glow.rotation.x = -0.3;
+    group.add(glow);
+
+    group.position.set(x, y, z);
+    group.rotation.y = rotY;
+    scene.add(group);
+}
+
+function createCoffeeCup(x, y, z) {
+    const cupGeo = new THREE.CylinderGeometry(0.035, 0.03, 0.08, 12);
+    const cupMat = new THREE.MeshStandardMaterial({ color: 0x2a3040, roughness: 0.4 });
+    const cup = new THREE.Mesh(cupGeo, cupMat);
+    cup.position.set(x, y + 0.04, z);
+    scene.add(cup);
+}
+
+function createPlant(x, y, z) {
+    // Pot
+    const potGeo = new THREE.CylinderGeometry(0.25, 0.2, 0.4, 8);
+    const potMat = new THREE.MeshStandardMaterial({ color: 0x1a2535, roughness: 0.7 });
+    const pot = new THREE.Mesh(potGeo, potMat);
+    pot.position.set(x, 0.2, z);
+    pot.castShadow = true;
+    scene.add(pot);
+
+    // Plant "leaves" as a sphere cluster
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x0a3a2a, roughness: 0.8 });
+    for (let i = 0; i < 5; i++) {
+        const leafGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 8, 6);
+        const leaf = new THREE.Mesh(leafGeo, leafMat);
+        leaf.position.set(
+            x + (Math.random() - 0.5) * 0.2,
+            0.5 + Math.random() * 0.3,
+            z + (Math.random() - 0.5) * 0.2
+        );
+        leaf.castShadow = true;
+        scene.add(leaf);
+    }
+}
+
+// ============================
+// INTERACTIVE STATIONS
+// ============================
+function buildStations() {
+    stationData.forEach(station => {
+        const group = new THREE.Group();
+        group.userData = { stationId: station.id, stationData: station };
+
+        // Pillar/pedestal
+        const pillarGeo = new THREE.BoxGeometry(0.8, 1.2, 0.15);
+        const pillarMat = new THREE.MeshStandardMaterial({ color: 0x0d1825, roughness: 0.5, metalness: 0.3 });
+        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar.position.y = 0.6;
+        group.add(pillar);
+
+        // Screen
+        const screenGeo = new THREE.PlaneGeometry(0.7, 0.9);
+        const canvas = document.createElement('canvas');
+        canvas.width = 280;
+        canvas.height = 360;
+        const ctx = canvas.getContext('2d');
+
+        // Background
+        ctx.fillStyle = '#0a1020';
+        ctx.fillRect(0, 0, 280, 360);
+
+        // Border
+        const colorHex = '#' + station.color.toString(16).padStart(6, '0');
+        ctx.strokeStyle = colorHex;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(10, 10, 260, 340);
+
+        // Station tag
+        ctx.fillStyle = colorHex;
+        ctx.font = 'bold 16px Segoe UI, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(station.tag, 140, 50);
+
+        // Divider
+        ctx.beginPath();
+        ctx.moveTo(60, 65);
+        ctx.lineTo(220, 65);
+        ctx.strokeStyle = colorHex + '44';
+        ctx.stroke();
+
+        // Title
+        ctx.fillStyle = '#e0f0ff';
+        ctx.font = 'bold 22px Segoe UI, system-ui, sans-serif';
+        // Word wrap title
+        const words = station.title.split(' ');
+        let line = '';
+        let lineY = 100;
+        words.forEach(word => {
+            const test = line + word + ' ';
+            if (ctx.measureText(test).width > 220) {
+                ctx.fillText(line, 140, lineY);
+                line = word + ' ';
+                lineY += 30;
+            } else {
+                line = test;
+            }
+        });
+        ctx.fillText(line, 140, lineY);
+
+        // Icon / decoration
+        ctx.fillStyle = colorHex + '33';
+        ctx.beginPath();
+        ctx.arc(140, 240, 50, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = colorHex;
+        ctx.font = '40px Segoe UI, system-ui, sans-serif';
+        const icons = ['🧠', '💬', '⚡', '🤖', '⚖️', '🚀'];
+        const idx = stationData.indexOf(station);
+        ctx.fillText(icons[idx], 125, 255);
+
+        // "Klik for at læse"
+        ctx.fillStyle = '#5a8aaa';
+        ctx.font = '14px Segoe UI, system-ui, sans-serif';
+        ctx.fillText('Klik for at læse mere', 140, 330);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const screenMat = new THREE.MeshBasicMaterial({ map: texture });
+        const screen = new THREE.Mesh(screenGeo, screenMat);
+        screen.position.set(0, 0.6, 0.09);
+        group.add(screen);
+
+        // Glow ring at base
+        const ringGeo = new THREE.RingGeometry(0.5, 0.55, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: station.color,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.DoubleSide
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.02;
+        group.add(ring);
+
+        // Floating indicator above
+        const indicatorGeo = new THREE.SphereGeometry(0.08, 16, 12);
+        const indicatorMat = new THREE.MeshBasicMaterial({
+            color: station.color,
+            transparent: true,
+            opacity: 0.7
+        });
+        const indicator = new THREE.Mesh(indicatorGeo, indicatorMat);
+        indicator.position.y = 1.5;
+        indicator.userData.isIndicator = true;
+        group.add(indicator);
+
+        // Point light for station
+        const stationLight = new THREE.PointLight(station.color, 0.5, 4);
+        stationLight.position.y = 1.2;
+        group.add(stationLight);
+
+        group.position.set(station.position.x, 0, station.position.z);
+
+        // Face center
+        group.lookAt(0, 0, 0);
+        group.rotation.x = 0;
+        group.rotation.z = 0;
+
+        scene.add(group);
+        interactiveObjects.push(group);
+    });
+}
+
+// ============================
+// LIGHTING
+// ============================
+function addLighting() {
+    // Ambient
+    const ambient = new THREE.AmbientLight(0x0a1525, 0.8);
+    scene.add(ambient);
+
+    // Main overhead lights
+    const mainLight1 = new THREE.PointLight(0x1a3a6a, 1.5, 20);
+    mainLight1.position.set(-4, 3.8, 0);
+    mainLight1.castShadow = true;
+    mainLight1.shadow.mapSize.set(1024, 1024);
+    scene.add(mainLight1);
+
+    const mainLight2 = new THREE.PointLight(0x1a3a6a, 1.5, 20);
+    mainLight2.position.set(4, 3.8, 0);
+    mainLight2.castShadow = true;
+    mainLight2.shadow.mapSize.set(1024, 1024);
+    scene.add(mainLight2);
+
+    // Accent blue spotlights
+    const spot1 = new THREE.SpotLight(0x00b4ff, 1.5, 15, Math.PI / 4, 0.5);
+    spot1.position.set(0, 3.9, -10);
+    spot1.target.position.set(0, 0, -10);
+    scene.add(spot1);
+    scene.add(spot1.target);
+
+    const spot2 = new THREE.SpotLight(0x00b4ff, 1.5, 15, Math.PI / 4, 0.5);
+    spot2.position.set(0, 3.9, 10);
+    spot2.target.position.set(0, 0, 10);
+    scene.add(spot2);
+    scene.add(spot2.target);
+
+    // Hemisphere light for ambient fill
+    const hemi = new THREE.HemisphereLight(0x0a1525, 0x0a0e1a, 0.5);
+    scene.add(hemi);
+}
+
+// ============================
+// DECORATIONS
+// ============================
+function addDecorations() {
+    // Floating particles
+    const particleCount = 200;
+    const particleGeo = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 22;
+        positions[i * 3 + 1] = Math.random() * 3.5 + 0.3;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 22;
+    }
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const particleMat = new THREE.PointsMaterial({
+        color: 0x00b4ff,
+        size: 0.03,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending
+    });
+    const particles = new THREE.Points(particleGeo, particleMat);
+    particles.userData.isParticles = true;
+    scene.add(particles);
+
+    // Momentum AI logo on wall (back wall)
+    addWallText('MOMENTUM AI', 0, 3.2, -11.9, 0.6, '#00b4ff');
+
+    // "Workshop" sub-text
+    addWallText('Generativ AI Workshop · København', 0, 0.35, -11.9, 0.18, '#2a5a7a');
+
+    // Side wall decorative text
+    addWallText('INNOVATION', -11.9, 3.2, 0, 0.4, '#0a3050', Math.PI / 2);
+    addWallText('AI · DATA · FREMTID', 11.9, 3.2, 0, 0.35, '#0a3050', -Math.PI / 2);
+}
+
+function addWallText(text, x, y, z, scale, color, rotY = 0) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = 'bold 60px Segoe UI, system-ui, sans-serif';
+    const metrics = ctx.measureText(text);
+    canvas.width = Math.ceil(metrics.width) + 40;
+    canvas.height = 80;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 60px Segoe UI, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const aspect = canvas.width / canvas.height;
+    const geo = new THREE.PlaneGeometry(scale * aspect, scale);
+    const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = rotY;
+    scene.add(mesh);
+}
+
+// ============================
+// CONTROLS
+// ============================
+function startExperience() {
+    startOverlay.classList.add('hidden');
+    hudEl.classList.remove('hidden');
+    crosshairEl.classList.add('visible');
+    document.body.requestPointerLock();
+}
+
+function onPointerLockChange() {
+    isLocked = document.pointerLockElement === document.body;
+    if (!isLocked && !panelOpen) {
+        crosshairEl.classList.remove('visible');
+        hudEl.classList.add('hidden');
+    } else if (isLocked) {
+        crosshairEl.classList.add('visible');
+        hudEl.classList.remove('hidden');
+    }
+}
+
+function onMouseMove(e) {
+    if (!isLocked || panelOpen) return;
+
+    const sensitivity = 0.002;
+    euler.setFromQuaternion(camera.quaternion);
+    euler.y -= e.movementX * sensitivity;
+    euler.x -= e.movementY * sensitivity;
+    euler.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, euler.x));
+    camera.quaternion.setFromEuler(euler);
+}
+
+function onKeyDown(e) {
+    if (panelOpen && e.code === 'Escape') {
+        closeInfoPanel();
+        return;
+    }
+    switch (e.code) {
+        case 'KeyW': case 'ArrowUp': moveForward = true; break;
+        case 'KeyS': case 'ArrowDown': moveBackward = true; break;
+        case 'KeyA': case 'ArrowLeft': moveLeft = true; break;
+        case 'KeyD': case 'ArrowRight': moveRight = true; break;
+    }
+}
+
+function onKeyUp(e) {
+    switch (e.code) {
+        case 'KeyW': case 'ArrowUp': moveForward = false; break;
+        case 'KeyS': case 'ArrowDown': moveBackward = false; break;
+        case 'KeyA': case 'ArrowLeft': moveLeft = false; break;
+        case 'KeyD': case 'ArrowRight': moveRight = false; break;
+    }
+}
+
+function onMouseClick() {
+    if (!isLocked) {
+        if (!panelOpen && !startOverlay.classList.contains('hidden') === false) {
+            document.body.requestPointerLock();
+        }
+        return;
+    }
+
+    if (panelOpen) return;
+
+    if (currentHovered) {
+        openInfoPanel(currentHovered);
+    }
+}
+
+// ============================
+// INFO PANEL
+// ============================
+function openInfoPanel(stationGroup) {
+    const data = stationGroup.userData.stationData;
+    panelTag.textContent = data.tag;
+    panelTitle.textContent = data.title;
+    panelContent.innerHTML = data.content;
+
+    const colorHex = '#' + data.color.toString(16).padStart(6, '0');
+    panelTag.style.color = colorHex;
+    panelTag.style.borderColor = colorHex + '66';
+    panelTag.style.background = colorHex + '22';
+    panelTitle.style.color = colorHex;
+
+    infoPanel.classList.add('visible');
+    panelOpen = true;
+    document.exitPointerLock();
+}
+
+function closeInfoPanel() {
+    infoPanel.classList.remove('visible');
+    panelOpen = false;
+    setTimeout(() => {
+        document.body.requestPointerLock();
+    }, 100);
+}
+
+// ============================
+// MINIMAP
+// ============================
+function drawMinimap() {
+    const ctx = minimapCtx;
+    const w = 150, h = 150;
+    const scale = w / 28; // room is 24 wide, some margin
+    const offsetX = w / 2;
+    const offsetY = h / 2;
+
+    ctx.fillStyle = 'rgba(8,16,32,0.9)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Room outline
+    ctx.strokeStyle = '#0a3050';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+        offsetX - 12 * scale, offsetY - 12 * scale,
+        24 * scale, 24 * scale
+    );
+
+    // Stations
+    stationData.forEach(s => {
+        const sx = offsetX + s.position.x * scale;
+        const sy = offsetY + s.position.z * scale;
+        ctx.fillStyle = '#' + s.color.toString(16).padStart(6, '0');
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    });
+
+    // Central table
+    ctx.fillStyle = '#1a2535';
+    ctx.fillRect(offsetX - 2 * scale, offsetY - 1 * scale, 4 * scale, 2 * scale);
+
+    // Player
+    const px = offsetX + camera.position.x * scale;
+    const py = offsetY + camera.position.z * scale;
+    ctx.fillStyle = '#00e0ff';
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Player direction
+    const dir = new THREE.Vector3(0, 0, -1);
+    dir.applyQuaternion(camera.quaternion);
+    ctx.strokeStyle = '#00e0ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + dir.x * 10, py + dir.z * 10);
+    ctx.stroke();
+}
+
+// ============================
+// ANIMATION LOOP
+// ============================
+function animate() {
+    requestAnimationFrame(animate);
+
+    const delta = clock.getDelta();
+    const time = clock.getElapsedTime();
+
+    // Movement
+    if (isLocked && !panelOpen) {
+        velocity.x -= velocity.x * 8.0 * delta;
+        velocity.z -= velocity.z * 8.0 * delta;
+
+        direction.z = Number(moveForward) - Number(moveBackward);
+        direction.x = Number(moveRight) - Number(moveLeft);
+        direction.normalize();
+
+        const speed = 5.0;
+        if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+        if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+
+        // Apply movement relative to camera direction
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyQuaternion(camera.quaternion);
+        forward.y = 0;
+        forward.normalize();
+
+        const right = new THREE.Vector3(1, 0, 0);
+        right.applyQuaternion(camera.quaternion);
+        right.y = 0;
+        right.normalize();
+
+        const move = new THREE.Vector3();
+        move.addScaledVector(forward, -velocity.z);
+        move.addScaledVector(right, velocity.x);
+
+        camera.position.add(move);
+
+        // Boundary collision
+        const bound = 11;
+        camera.position.x = Math.max(-bound, Math.min(bound, camera.position.x));
+        camera.position.z = Math.max(-bound, Math.min(bound, camera.position.z));
+        camera.position.y = playerHeight;
+    }
+
+    // Raycasting for interaction
+    if (isLocked && !panelOpen) {
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+        let found = null;
+        for (const obj of interactiveObjects) {
+            const intersects = raycaster.intersectObjects(obj.children, true);
+            if (intersects.length > 0 && intersects[0].distance < 4) {
+                found = obj;
+                break;
+            }
+        }
+
+        if (found !== currentHovered) {
+            currentHovered = found;
+            if (found) {
+                interactPrompt.classList.add('visible');
+                crosshairEl.classList.add('active');
+            } else {
+                interactPrompt.classList.remove('visible');
+                crosshairEl.classList.remove('active');
+            }
+        }
+    }
+
+    // Animate floating indicators
+    scene.traverse(child => {
+        if (child.userData.isIndicator) {
+            child.position.y = 1.5 + Math.sin(time * 2 + child.parent.position.x) * 0.1;
+        }
+    });
+
+    // Animate particles
+    scene.traverse(child => {
+        if (child.userData.isParticles) {
+            const positions = child.geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i + 1] += Math.sin(time + positions[i] * 0.5) * 0.001;
+                if (positions[i + 1] > 3.8) positions[i + 1] = 0.3;
+                if (positions[i + 1] < 0.2) positions[i + 1] = 3.8;
+            }
+            child.geometry.attributes.position.needsUpdate = true;
+        }
+    });
+
+    // Draw minimap
+    drawMinimap();
+
+    renderer.render(scene, camera);
+}
+
+function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+</script>
+</body>
+</html>
