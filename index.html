@@ -1111,7 +1111,7 @@ function animate() {
         direction.x = Number(moveRight) - Number(moveLeft);
         direction.normalize();
 
-        const speed = 5.0;
+        const speed = 2.5;
         if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
         if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
 
@@ -1128,7 +1128,7 @@ function animate() {
 
         const move = new THREE.Vector3();
         move.addScaledVector(forward, -velocity.z);
-        move.addScaledVector(right, velocity.x);
+        move.addScaledVector(right, -velocity.x);
 
         camera.position.add(move);
 
