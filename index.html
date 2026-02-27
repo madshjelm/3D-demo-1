@@ -217,14 +217,40 @@
             display: flex; align-items: center; gap: 12px;
         }
         .music-toggle {
-            width: 36px; height: 36px; border-radius: 50%;
+            width: 40px; height: 40px; border-radius: 50%;
             border: 1px solid rgba(0,180,255,0.4); background: rgba(0,180,255,0.1);
-            color: #00e0ff; font-size: 1rem; cursor: pointer;
+            color: #00e0ff; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            transition: all 0.3s; flex-shrink: 0;
+            transition: all 0.3s; flex-shrink: 0; padding: 0;
         }
+        .music-toggle svg { width: 16px; height: 16px; fill: #00e0ff; }
         .music-toggle:hover { background: rgba(0,180,255,0.25); }
         .music-toggle.playing { background: rgba(0,180,255,0.25); border-color: #00b4ff; }
+
+        /* Start overlay music option */
+        .start-music-option {
+            margin-top: 1.5rem;
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+        }
+        .start-music-option label {
+            color: #5a8aaa; font-size: 0.9rem; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .start-music-option input[type="checkbox"] {
+            -webkit-appearance: none; appearance: none;
+            width: 18px; height: 18px; border-radius: 4px;
+            border: 1px solid rgba(0,180,255,0.4); background: rgba(0,180,255,0.1);
+            cursor: pointer; position: relative; flex-shrink: 0;
+        }
+        .start-music-option input[type="checkbox"]:checked {
+            background: rgba(0,180,255,0.3); border-color: #00b4ff;
+        }
+        .start-music-option input[type="checkbox"]:checked::after {
+            content: ''; position: absolute; left: 5px; top: 2px;
+            width: 5px; height: 9px;
+            border: solid #00e0ff; border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
 
         .pause-controls-hint {
             margin-top: 1.5rem; color: #3a6a8a; font-size: 0.8rem; line-height: 1.8;
@@ -251,6 +277,12 @@
         Velkommen til Momentum AI's interaktive 3D workshop-lokale i København.
         Udforsk lokalet og lær om generativ AI ved at besøge de forskellige stationer.
     </p>
+    <div class="start-music-option">
+        <label>
+            <input type="checkbox" id="start-music-checkbox" checked>
+            Afspil baggrundsmusik
+        </label>
+    </div>
     <button class="start-btn" id="start-btn">Start Oplevelsen</button>
     <div class="controls-hint">
         <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> for at bevæge dig &nbsp;|&nbsp;
@@ -320,7 +352,7 @@
             <div class="setting-row">
                 <label>Baggrundsmusik</label>
                 <div class="music-controls">
-                    <button class="music-toggle" id="music-toggle" title="Afspil/Pause musik">&#9654;</button>
+                    <button class="music-toggle" id="music-toggle" title="Afspil/Pause musik"><svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg></button>
                     <div class="slider-wrap">
                         <input type="range" class="setting-slider" id="volume-slider" min="0" max="100" value="30" step="1">
                         <span class="slider-value" id="volume-value">30%</span>
@@ -512,6 +544,7 @@ const musicToggle = document.getElementById('music-toggle');
 const volumeSlider = document.getElementById('volume-slider');
 const volumeValue = document.getElementById('volume-value');
 const bgMusic = document.getElementById('bg-music');
+const startMusicCheckbox = document.getElementById('start-music-checkbox');
 
 init();
 
@@ -1158,6 +1191,14 @@ function startExperience() {
     hudEl.classList.remove('hidden');
     crosshairEl.classList.add('visible');
     document.body.requestPointerLock();
+
+    // Start music if checkbox is checked
+    if (startMusicCheckbox.checked && !musicPlaying) {
+        bgMusic.play().catch(() => {});
+        musicPlaying = true;
+        musicToggle.innerHTML = '<svg viewBox="0 0 16 16"><rect x="2" y="2" width="4" height="12"/><rect x="10" y="2" width="4" height="12"/></svg>';
+        musicToggle.classList.add('playing');
+    }
 }
 
 function onPointerLockChange() {
@@ -1288,12 +1329,12 @@ function toggleMusic() {
     if (musicPlaying) {
         bgMusic.pause();
         musicPlaying = false;
-        musicToggle.innerHTML = '&#9654;';
+        musicToggle.innerHTML = '<svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>';
         musicToggle.classList.remove('playing');
     } else {
         bgMusic.play().catch(() => {});
         musicPlaying = true;
-        musicToggle.innerHTML = '&#9646;&#9646;';
+        musicToggle.innerHTML = '<svg viewBox="0 0 16 16"><rect x="2" y="2" width="4" height="12"/><rect x="10" y="2" width="4" height="12"/></svg>';
         musicToggle.classList.add('playing');
     }
 }
