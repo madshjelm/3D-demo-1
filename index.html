@@ -490,6 +490,7 @@ let mouse = new THREE.Vector2(0, 0);
 let currentHovered = null;
 let playerHeight = 1.7;
 let minimapCtx;
+let starfieldGroup;
 
 // Settings
 let mouseSensitivity = 0.002;
@@ -568,6 +569,7 @@ function init() {
         buildStations();
         addLighting();
         addDecorations();
+        createStarfield();
 
         // Show start overlay
         loadingEl.classList.add('hidden');
@@ -641,121 +643,6 @@ function simulateLoading(callback) {
 }
 
 // ============================
-// STARRY CEILING TEXTURE
-// ============================
-function createStarryCeilingTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1024;
-    const ctx = canvas.getContext('2d');
-
-    // Dark background gradient
-    const gradient = ctx.createRadialGradient(512, 512, 0, 512, 512, 600);
-    gradient.addColorStop(0, '#0c1528');
-    gradient.addColorStop(0.5, '#080e1a');
-    gradient.addColorStop(1, '#050a12');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 1024, 1024);
-
-    // Subtle milky way band
-    ctx.save();
-    ctx.translate(512, 512);
-    ctx.rotate(Math.PI * 0.15);
-    const mwGrad = ctx.createLinearGradient(-600, 0, 600, 0);
-    mwGrad.addColorStop(0, 'rgba(15, 25, 60, 0)');
-    mwGrad.addColorStop(0.3, 'rgba(20, 35, 80, 0.08)');
-    mwGrad.addColorStop(0.5, 'rgba(25, 40, 90, 0.12)');
-    mwGrad.addColorStop(0.7, 'rgba(20, 35, 80, 0.08)');
-    mwGrad.addColorStop(1, 'rgba(15, 25, 60, 0)');
-    ctx.fillStyle = mwGrad;
-    ctx.fillRect(-600, -80, 1200, 160);
-    ctx.restore();
-
-    // Star color palette
-    const starColors = [
-        'rgba(255, 255, 255,',    // white
-        'rgba(200, 220, 255,',    // cool blue-white
-        'rgba(170, 200, 255,',    // light blue
-        'rgba(130, 170, 255,',    // blue
-        'rgba(255, 240, 220,',    // warm white
-        'rgba(255, 220, 180,',    // warm yellow
-    ];
-
-    // Small background stars (~400)
-    for (let i = 0; i < 400; i++) {
-        const x = Math.random() * 1024;
-        const y = Math.random() * 1024;
-        const size = Math.random() * 1.5 + 0.5;
-        const opacity = Math.random() * 0.6 + 0.2;
-        const color = starColors[Math.floor(Math.random() * starColors.length)];
-
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fillStyle = color + opacity + ')';
-        ctx.fill();
-    }
-
-    // Medium stars with glow (~60)
-    for (let i = 0; i < 60; i++) {
-        const x = Math.random() * 1024;
-        const y = Math.random() * 1024;
-        const size = Math.random() * 2 + 1.5;
-        const opacity = Math.random() * 0.5 + 0.4;
-        const color = starColors[Math.floor(Math.random() * starColors.length)];
-
-        // Glow
-        const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 3);
-        glow.addColorStop(0, color + (opacity * 0.4) + ')');
-        glow.addColorStop(1, color + '0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(x - size * 3, y - size * 3, size * 6, size * 6);
-
-        // Core
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fillStyle = color + opacity + ')';
-        ctx.fill();
-    }
-
-    // Bright focal stars (~20)
-    for (let i = 0; i < 20; i++) {
-        const x = Math.random() * 1024;
-        const y = Math.random() * 1024;
-        const size = Math.random() * 2 + 2;
-        const color = starColors[Math.floor(Math.random() * 3)]; // prefer white/blue
-
-        // Large glow
-        const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 5);
-        glow.addColorStop(0, color + '0.5)');
-        glow.addColorStop(0.3, color + '0.15)');
-        glow.addColorStop(1, color + '0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(x - size * 5, y - size * 5, size * 10, size * 10);
-
-        // Cross flare
-        ctx.strokeStyle = color + '0.3)';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(x - size * 4, y);
-        ctx.lineTo(x + size * 4, y);
-        ctx.moveTo(x, y - size * 4);
-        ctx.lineTo(x, y + size * 4);
-        ctx.stroke();
-
-        // Core
-        ctx.beginPath();
-        ctx.arc(x, y, size * 0.8, 0, Math.PI * 2);
-        ctx.fillStyle = color + '0.9)';
-        ctx.fill();
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    return texture;
-}
-
-// ============================
 // BUILD THE ROOM
 // ============================
 function buildRoom() {
@@ -780,22 +667,12 @@ function buildRoom() {
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
-    // Starry sky dome (replaces flat ceiling for skybox-like depth)
-    const starTexture = createStarryCeilingTexture();
-    const domeGeo = new THREE.SphereGeometry(
-        17,              // radius - fits room diagonal
-        64,              // width segments
-        32,              // height segments
-        0, Math.PI * 2,  // full horizontal circle
-        0, Math.PI / 2   // upper hemisphere only
-    );
-    const domeMat = new THREE.MeshStandardMaterial({
-        map: starTexture,
-        emissive: 0xffffff,
-        emissiveMap: starTexture,
-        emissiveIntensity: 0.4,
-        roughness: 1,
-        side: THREE.BackSide
+    // Dark backdrop dome (large radius for sky depth illusion)
+    const domeGeo = new THREE.SphereGeometry(80, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    const domeMat = new THREE.MeshBasicMaterial({
+        color: 0x030610,
+        side: THREE.BackSide,
+        fog: false
     });
     const dome = new THREE.Mesh(domeGeo, domeMat);
     dome.position.y = roomHeight;
@@ -1269,6 +1146,58 @@ function addLighting() {
 }
 
 // ============================
+// 3D STARFIELD
+// ============================
+function createStarfield() {
+    starfieldGroup = new THREE.Group();
+    starfieldGroup.position.y = 4; // dome base at ceiling height
+
+    const layers = [
+        { count: 550, rMin: 40, rMax: 75, elevMin: 5, elevMax: 90,
+          size: 0.8, color: 0x8899bb, opacity: 0.35 },
+        { count: 200, rMin: 30, rMax: 65, elevMin: 5, elevMax: 90,
+          size: 2.0, color: 0xccddff, opacity: 0.6 },
+        { count: 50, rMin: 25, rMax: 55, elevMin: 10, elevMax: 85,
+          size: 4.5, color: 0xffffff, opacity: 0.85 }
+    ];
+
+    layers.forEach((cfg, layerIndex) => {
+        const geo = new THREE.BufferGeometry();
+        const positions = new Float32Array(cfg.count * 3);
+        const elevMinRad = cfg.elevMin * Math.PI / 180;
+        const elevMaxRad = cfg.elevMax * Math.PI / 180;
+
+        for (let i = 0; i < cfg.count; i++) {
+            const azimuth = Math.random() * Math.PI * 2;
+            const elevation = elevMinRad + Math.random() * (elevMaxRad - elevMinRad);
+            const r = cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin);
+            positions[i * 3]     = Math.cos(azimuth) * Math.cos(elevation) * r;
+            positions[i * 3 + 1] = Math.sin(elevation) * r;
+            positions[i * 3 + 2] = Math.sin(azimuth) * Math.cos(elevation) * r;
+        }
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const mat = new THREE.PointsMaterial({
+            color: cfg.color,
+            size: cfg.size,
+            transparent: true,
+            opacity: cfg.opacity,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: true,
+            fog: false,
+            depthWrite: false
+        });
+
+        const points = new THREE.Points(geo, mat);
+        points.userData.starLayer = layerIndex;
+        points.userData.baseOpacity = cfg.opacity;
+        starfieldGroup.add(points);
+    });
+
+    scene.add(starfieldGroup);
+}
+
+// ============================
 // DECORATIONS
 // ============================
 function addDecorations() {
@@ -1294,43 +1223,6 @@ function addDecorations() {
     const particles = new THREE.Points(particleGeo, particleMat);
     particles.userData.isParticles = true;
     scene.add(particles);
-
-    // Twinkling ceiling stars
-    const ceilingStarCount = 80;
-    const ceilStarGeo = new THREE.BufferGeometry();
-    const ceilStarPositions = new Float32Array(ceilingStarCount * 3);
-    const ceilStarSizes = new Float32Array(ceilingStarCount);
-    const ceilStarPhases = new Float32Array(ceilingStarCount);
-    const ceilStarSpeeds = new Float32Array(ceilingStarCount);
-
-    for (let i = 0; i < ceilingStarCount; i++) {
-        // Distribute stars within dome volume (spherical coordinates)
-        const angle = Math.random() * Math.PI * 2;
-        const elevation = Math.random() * Math.PI * 0.4; // 0 to ~72 degrees up
-        const r = 14 + Math.random() * 2; // slightly inside dome radius (14-16)
-        ceilStarPositions[i * 3] = Math.cos(angle) * Math.cos(elevation) * r;
-        ceilStarPositions[i * 3 + 1] = 4 + Math.sin(elevation) * r;
-        ceilStarPositions[i * 3 + 2] = Math.sin(angle) * Math.cos(elevation) * r;
-        ceilStarSizes[i] = Math.random() * 0.03 + 0.04;
-        ceilStarPhases[i] = Math.random() * Math.PI * 2;
-        ceilStarSpeeds[i] = Math.random() * 1.5 + 0.5;
-    }
-    ceilStarGeo.setAttribute('position', new THREE.BufferAttribute(ceilStarPositions, 3));
-    ceilStarGeo.setAttribute('phase', new THREE.BufferAttribute(ceilStarPhases, 1));
-    ceilStarGeo.setAttribute('speed', new THREE.BufferAttribute(ceilStarSpeeds, 1));
-
-    const ceilStarMat = new THREE.PointsMaterial({
-        color: 0xeeeeff,
-        size: 0.05,
-        transparent: true,
-        opacity: 0.8,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true
-    });
-    const ceilingStars = new THREE.Points(ceilStarGeo, ceilStarMat);
-    ceilingStars.userData.isCeilingStars = true;
-    ceilingStars.userData.baseSizes = ceilStarSizes;
-    scene.add(ceilingStars);
 
     // Momentum AI logo on wall (back wall)
     addWallText('MOMENTUM AI', 0, 3.2, -11.9, 0.6, '#00b4ff');
@@ -1679,39 +1571,18 @@ function animate() {
         }
     });
 
-    // Animate twinkling ceiling stars (dome coordinates)
-    scene.traverse(child => {
-        if (child.userData.isCeilingStars) {
-            const phases = child.geometry.attributes.phase.array;
-            const speeds = child.geometry.attributes.speed.array;
-            const count = phases.length;
-            const mat = child.material;
-
-            // Per-star twinkle via global opacity variation
-            let totalBrightness = 0;
-            for (let i = 0; i < count; i++) {
-                totalBrightness += 0.5 + 0.5 * Math.sin(time * speeds[i] + phases[i]);
-            }
-            mat.opacity = 0.4 + 0.5 * (totalBrightness / count);
-
-            // Subtle radial shimmer within dome volume
-            const positions = child.geometry.attributes.position.array;
-            for (let i = 0; i < count; i++) {
-                const shimmer = Math.sin(time * speeds[i] * 0.3 + phases[i]) * 0.05;
-                const px = positions[i * 3];
-                const py = positions[i * 3 + 1] - 4; // relative to dome base
-                const pz = positions[i * 3 + 2];
-                const dist = Math.sqrt(px * px + py * py + pz * pz);
-                if (dist > 0) {
-                    const scale = 1 + shimmer / dist;
-                    positions[i * 3] = px * scale;
-                    positions[i * 3 + 1] = 4 + py * scale;
-                    positions[i * 3 + 2] = pz * scale;
-                }
-            }
-            child.geometry.attributes.position.needsUpdate = true;
-        }
-    });
+    // Animate 3D starfield (slow rotation + layer opacity breathing)
+    if (starfieldGroup) {
+        starfieldGroup.rotation.y += delta * 0.003;
+        const twinkleSpeeds = [0.7, 0.5, 0.3];
+        const twinkleOffsets = [0, 1.0, 2.0];
+        const twinkleAmplitudes = [0.08, 0.10, 0.10];
+        starfieldGroup.children.forEach(layer => {
+            const idx = layer.userData.starLayer;
+            const base = layer.userData.baseOpacity;
+            layer.material.opacity = base + twinkleAmplitudes[idx] * Math.sin(time * twinkleSpeeds[idx] + twinkleOffsets[idx]);
+        });
+    }
 
     // Draw minimap
     drawMinimap();
