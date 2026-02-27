@@ -641,6 +641,121 @@ function simulateLoading(callback) {
 }
 
 // ============================
+// STARRY CEILING TEXTURE
+// ============================
+function createStarryCeilingTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    // Dark background gradient
+    const gradient = ctx.createRadialGradient(512, 512, 0, 512, 512, 600);
+    gradient.addColorStop(0, '#0c1528');
+    gradient.addColorStop(0.5, '#080e1a');
+    gradient.addColorStop(1, '#050a12');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    // Subtle milky way band
+    ctx.save();
+    ctx.translate(512, 512);
+    ctx.rotate(Math.PI * 0.15);
+    const mwGrad = ctx.createLinearGradient(-600, 0, 600, 0);
+    mwGrad.addColorStop(0, 'rgba(15, 25, 60, 0)');
+    mwGrad.addColorStop(0.3, 'rgba(20, 35, 80, 0.08)');
+    mwGrad.addColorStop(0.5, 'rgba(25, 40, 90, 0.12)');
+    mwGrad.addColorStop(0.7, 'rgba(20, 35, 80, 0.08)');
+    mwGrad.addColorStop(1, 'rgba(15, 25, 60, 0)');
+    ctx.fillStyle = mwGrad;
+    ctx.fillRect(-600, -80, 1200, 160);
+    ctx.restore();
+
+    // Star color palette
+    const starColors = [
+        'rgba(255, 255, 255,',    // white
+        'rgba(200, 220, 255,',    // cool blue-white
+        'rgba(170, 200, 255,',    // light blue
+        'rgba(130, 170, 255,',    // blue
+        'rgba(255, 240, 220,',    // warm white
+        'rgba(255, 220, 180,',    // warm yellow
+    ];
+
+    // Small background stars (~400)
+    for (let i = 0; i < 400; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        const size = Math.random() * 1.5 + 0.5;
+        const opacity = Math.random() * 0.6 + 0.2;
+        const color = starColors[Math.floor(Math.random() * starColors.length)];
+
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fillStyle = color + opacity + ')';
+        ctx.fill();
+    }
+
+    // Medium stars with glow (~60)
+    for (let i = 0; i < 60; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        const size = Math.random() * 2 + 1.5;
+        const opacity = Math.random() * 0.5 + 0.4;
+        const color = starColors[Math.floor(Math.random() * starColors.length)];
+
+        // Glow
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 3);
+        glow.addColorStop(0, color + (opacity * 0.4) + ')');
+        glow.addColorStop(1, color + '0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - size * 3, y - size * 3, size * 6, size * 6);
+
+        // Core
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fillStyle = color + opacity + ')';
+        ctx.fill();
+    }
+
+    // Bright focal stars (~20)
+    for (let i = 0; i < 20; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        const size = Math.random() * 2 + 2;
+        const color = starColors[Math.floor(Math.random() * 3)]; // prefer white/blue
+
+        // Large glow
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 5);
+        glow.addColorStop(0, color + '0.5)');
+        glow.addColorStop(0.3, color + '0.15)');
+        glow.addColorStop(1, color + '0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - size * 5, y - size * 5, size * 10, size * 10);
+
+        // Cross flare
+        ctx.strokeStyle = color + '0.3)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x - size * 4, y);
+        ctx.lineTo(x + size * 4, y);
+        ctx.moveTo(x, y - size * 4);
+        ctx.lineTo(x, y + size * 4);
+        ctx.stroke();
+
+        // Core
+        ctx.beginPath();
+        ctx.arc(x, y, size * 0.8, 0, Math.PI * 2);
+        ctx.fillStyle = color + '0.9)';
+        ctx.fill();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+// ============================
 // BUILD THE ROOM
 // ============================
 function buildRoom() {
@@ -665,9 +780,17 @@ function buildRoom() {
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
-    // Ceiling
+    // Ceiling with starry sky texture
     const ceilGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
-    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x0a1020, roughness: 1, side: THREE.DoubleSide });
+    const starTexture = createStarryCeilingTexture();
+    const ceilMat = new THREE.MeshStandardMaterial({
+        map: starTexture,
+        emissive: 0xffffff,
+        emissiveMap: starTexture,
+        emissiveIntensity: 0.35,
+        roughness: 1,
+        side: THREE.DoubleSide
+    });
     const ceiling = new THREE.Mesh(ceilGeo, ceilMat);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.y = roomHeight;
@@ -1080,39 +1203,48 @@ function buildStations() {
 // LIGHTING
 // ============================
 function addLighting() {
-    // Ambient
-    const ambient = new THREE.AmbientLight(0x0a1525, 0.8);
+    // Ambient - brighter fill
+    const ambient = new THREE.AmbientLight(0x1a2535, 1.2);
     scene.add(ambient);
 
-    // Main overhead lights
-    const mainLight1 = new THREE.PointLight(0x1a3a6a, 1.5, 20);
+    // Main overhead lights - increased intensity and brighter color
+    const mainLight1 = new THREE.PointLight(0x2a4a7a, 2.0, 20);
     mainLight1.position.set(-4, 3.8, 0);
     mainLight1.castShadow = true;
     mainLight1.shadow.mapSize.set(1024, 1024);
     scene.add(mainLight1);
 
-    const mainLight2 = new THREE.PointLight(0x1a3a6a, 1.5, 20);
+    const mainLight2 = new THREE.PointLight(0x2a4a7a, 2.0, 20);
     mainLight2.position.set(4, 3.8, 0);
     mainLight2.castShadow = true;
     mainLight2.shadow.mapSize.set(1024, 1024);
     scene.add(mainLight2);
 
-    // Accent blue spotlights
-    const spot1 = new THREE.SpotLight(0x00b4ff, 1.5, 15, Math.PI / 4, 0.5);
+    // Accent blue spotlights - increased intensity
+    const spot1 = new THREE.SpotLight(0x00b4ff, 2.0, 15, Math.PI / 4, 0.5);
     spot1.position.set(0, 3.9, -10);
     spot1.target.position.set(0, 0, -10);
     scene.add(spot1);
     scene.add(spot1.target);
 
-    const spot2 = new THREE.SpotLight(0x00b4ff, 1.5, 15, Math.PI / 4, 0.5);
+    const spot2 = new THREE.SpotLight(0x00b4ff, 2.0, 15, Math.PI / 4, 0.5);
     spot2.position.set(0, 3.9, 10);
     spot2.target.position.set(0, 0, 10);
     scene.add(spot2);
     scene.add(spot2.target);
 
-    // Hemisphere light for ambient fill
-    const hemi = new THREE.HemisphereLight(0x0a1525, 0x0a0e1a, 0.5);
+    // Hemisphere light for ambient fill - increased
+    const hemi = new THREE.HemisphereLight(0x1a2535, 0x0a0e1a, 0.8);
     scene.add(hemi);
+
+    // Additional center fill lights for better room coverage
+    const fillLight1 = new THREE.PointLight(0x1a3050, 1.0, 18);
+    fillLight1.position.set(0, 3.5, -5);
+    scene.add(fillLight1);
+
+    const fillLight2 = new THREE.PointLight(0x1a3050, 1.0, 18);
+    fillLight2.position.set(0, 3.5, 5);
+    scene.add(fillLight2);
 }
 
 // ============================
@@ -1141,6 +1273,39 @@ function addDecorations() {
     const particles = new THREE.Points(particleGeo, particleMat);
     particles.userData.isParticles = true;
     scene.add(particles);
+
+    // Twinkling ceiling stars
+    const ceilingStarCount = 80;
+    const ceilStarGeo = new THREE.BufferGeometry();
+    const ceilStarPositions = new Float32Array(ceilingStarCount * 3);
+    const ceilStarSizes = new Float32Array(ceilingStarCount);
+    const ceilStarPhases = new Float32Array(ceilingStarCount);
+    const ceilStarSpeeds = new Float32Array(ceilingStarCount);
+
+    for (let i = 0; i < ceilingStarCount; i++) {
+        ceilStarPositions[i * 3] = (Math.random() - 0.5) * 22;
+        ceilStarPositions[i * 3 + 1] = 3.85 + Math.random() * 0.1;
+        ceilStarPositions[i * 3 + 2] = (Math.random() - 0.5) * 22;
+        ceilStarSizes[i] = Math.random() * 0.03 + 0.04;
+        ceilStarPhases[i] = Math.random() * Math.PI * 2;
+        ceilStarSpeeds[i] = Math.random() * 1.5 + 0.5;
+    }
+    ceilStarGeo.setAttribute('position', new THREE.BufferAttribute(ceilStarPositions, 3));
+    ceilStarGeo.setAttribute('phase', new THREE.BufferAttribute(ceilStarPhases, 1));
+    ceilStarGeo.setAttribute('speed', new THREE.BufferAttribute(ceilStarSpeeds, 1));
+
+    const ceilStarMat = new THREE.PointsMaterial({
+        color: 0xeeeeff,
+        size: 0.05,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true
+    });
+    const ceilingStars = new THREE.Points(ceilStarGeo, ceilStarMat);
+    ceilingStars.userData.isCeilingStars = true;
+    ceilingStars.userData.baseSizes = ceilStarSizes;
+    scene.add(ceilingStars);
 
     // Momentum AI logo on wall (back wall)
     addWallText('MOMENTUM AI', 0, 3.2, -11.9, 0.6, '#00b4ff');
@@ -1484,6 +1649,31 @@ function animate() {
                 positions[i + 1] += Math.sin(time + positions[i] * 0.5) * 0.001;
                 if (positions[i + 1] > 3.8) positions[i + 1] = 0.3;
                 if (positions[i + 1] < 0.2) positions[i + 1] = 3.8;
+            }
+            child.geometry.attributes.position.needsUpdate = true;
+        }
+    });
+
+    // Animate twinkling ceiling stars
+    scene.traverse(child => {
+        if (child.userData.isCeilingStars) {
+            const phases = child.geometry.attributes.phase.array;
+            const speeds = child.geometry.attributes.speed.array;
+            const baseSizes = child.userData.baseSizes;
+            const count = phases.length;
+            const mat = child.material;
+
+            // Global opacity twinkle based on average
+            let totalBrightness = 0;
+            for (let i = 0; i < count; i++) {
+                totalBrightness += 0.5 + 0.5 * Math.sin(time * speeds[i] + phases[i]);
+            }
+            mat.opacity = 0.4 + 0.5 * (totalBrightness / count);
+
+            // Slight position shimmer
+            const positions = child.geometry.attributes.position.array;
+            for (let i = 0; i < count; i++) {
+                positions[i * 3 + 1] = 3.85 + Math.sin(time * speeds[i] * 0.3 + phases[i]) * 0.02;
             }
             child.geometry.attributes.position.needsUpdate = true;
         }
