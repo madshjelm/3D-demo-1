@@ -714,31 +714,6 @@ function buildRoom() {
     addNeonStrip(-roomWidth / 2 + 0.01, 0.05, 0, roomDepth, 0.06, 0x00b4ff, Math.PI / 2);
     addNeonStrip(roomWidth / 2 - 0.01, 0.05, 0, roomDepth, 0.06, 0x00b4ff, -Math.PI / 2);
 
-    // Glowing rim where walls meet sky dome
-    const rimGeo = new THREE.RingGeometry(11.5, 12.2, 64);
-    const rimMat = new THREE.MeshBasicMaterial({
-        color: 0x0a2040,
-        transparent: true,
-        opacity: 0.4,
-        side: THREE.DoubleSide
-    });
-    const rim = new THREE.Mesh(rimGeo, rimMat);
-    rim.rotation.x = -Math.PI / 2;
-    rim.position.y = roomHeight + 0.01;
-    scene.add(rim);
-
-    // Neon accent ring at wall-sky transition
-    const accentRimGeo = new THREE.RingGeometry(11.9, 12.05, 64);
-    const accentRimMat = new THREE.MeshBasicMaterial({
-        color: 0x00b4ff,
-        transparent: true,
-        opacity: 0.15,
-        side: THREE.DoubleSide
-    });
-    const accentRim = new THREE.Mesh(accentRimGeo, accentRimMat);
-    accentRim.rotation.x = -Math.PI / 2;
-    accentRim.position.y = roomHeight + 0.02;
-    scene.add(accentRim);
 }
 
 function addNeonStrip(x, y, z, width, height, color, rotY) {
@@ -1156,9 +1131,9 @@ function createStarfield() {
         { count: 550, rMin: 40, rMax: 75, elevMin: 5, elevMax: 90,
           size: 0.8, color: 0x8899bb, opacity: 0.35 },
         { count: 200, rMin: 30, rMax: 65, elevMin: 5, elevMax: 90,
-          size: 2.0, color: 0xccddff, opacity: 0.6 },
+          size: 0.8, color: 0xccddff, opacity: 0.6 },
         { count: 50, rMin: 25, rMax: 55, elevMin: 10, elevMax: 85,
-          size: 4.5, color: 0xffffff, opacity: 0.85 }
+          size: 0.9, color: 0xffffff, opacity: 0.85 }
     ];
 
     layers.forEach((cfg, layerIndex) => {
