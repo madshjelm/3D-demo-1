@@ -227,30 +227,6 @@
         .music-toggle:hover { background: rgba(0,180,255,0.25); }
         .music-toggle.playing { background: rgba(0,180,255,0.25); border-color: #00b4ff; }
 
-        /* Start overlay music option */
-        .start-music-option {
-            margin-top: 1.5rem;
-            display: flex; align-items: center; justify-content: center; gap: 12px;
-        }
-        .start-music-option label {
-            color: #5a8aaa; font-size: 0.9rem; cursor: pointer;
-            display: flex; align-items: center; gap: 8px;
-        }
-        .start-music-option input[type="checkbox"] {
-            -webkit-appearance: none; appearance: none;
-            width: 18px; height: 18px; border-radius: 4px;
-            border: 1px solid rgba(0,180,255,0.4); background: rgba(0,180,255,0.1);
-            cursor: pointer; position: relative; flex-shrink: 0;
-        }
-        .start-music-option input[type="checkbox"]:checked {
-            background: rgba(0,180,255,0.3); border-color: #00b4ff;
-        }
-        .start-music-option input[type="checkbox"]:checked::after {
-            content: ''; position: absolute; left: 5px; top: 2px;
-            width: 5px; height: 9px;
-            border: solid #00e0ff; border-width: 0 2px 2px 0;
-            transform: rotate(45deg);
-        }
 
         .pause-controls-hint {
             margin-top: 1.5rem; color: #3a6a8a; font-size: 0.8rem; line-height: 1.8;
@@ -277,11 +253,18 @@
         Velkommen til Momentum AI's interaktive 3D workshop-lokale i København.
         Udforsk lokalet og lær om generativ AI ved at besøge de forskellige stationer.
     </p>
-    <div class="start-music-option">
-        <label>
-            <input type="checkbox" id="start-music-checkbox" checked>
-            Afspil baggrundsmusik
-        </label>
+    <div class="settings-section" style="max-width: 400px; margin-bottom: 1.5rem;">
+        <h3>Musik</h3>
+        <div class="setting-row">
+            <label>Baggrundsmusik</label>
+            <div class="music-controls">
+                <button class="music-toggle" id="start-music-toggle" title="Afspil/Pause musik"><svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg></button>
+                <div class="slider-wrap">
+                    <input type="range" class="setting-slider" id="start-volume-slider" min="0" max="100" value="30" step="1">
+                    <span class="slider-value" id="start-volume-value">30%</span>
+                </div>
+            </div>
+        </div>
     </div>
     <button class="start-btn" id="start-btn">Start Oplevelsen</button>
     <div class="controls-hint">
@@ -544,7 +527,9 @@ const musicToggle = document.getElementById('music-toggle');
 const volumeSlider = document.getElementById('volume-slider');
 const volumeValue = document.getElementById('volume-value');
 const bgMusic = document.getElementById('bg-music');
-const startMusicCheckbox = document.getElementById('start-music-checkbox');
+const startMusicToggle = document.getElementById('start-music-toggle');
+const startVolumeSlider = document.getElementById('start-volume-slider');
+const startVolumeValue = document.getElementById('start-volume-value');
 
 init();
 
@@ -619,8 +604,18 @@ function init() {
         }
     });
     musicToggle.addEventListener('click', toggleMusic);
+    startMusicToggle.addEventListener('click', toggleMusic);
     volumeSlider.addEventListener('input', (e) => {
         const val = parseInt(e.target.value);
+        volumeValue.textContent = val + '%';
+        startVolumeSlider.value = val;
+        startVolumeValue.textContent = val + '%';
+        setMusicVolume(val / 100);
+    });
+    startVolumeSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        startVolumeValue.textContent = val + '%';
+        volumeSlider.value = val;
         volumeValue.textContent = val + '%';
         setMusicVolume(val / 100);
     });
@@ -1191,14 +1186,6 @@ function startExperience() {
     hudEl.classList.remove('hidden');
     crosshairEl.classList.add('visible');
     document.body.requestPointerLock();
-
-    // Start music if checkbox is checked
-    if (startMusicCheckbox.checked && !musicPlaying) {
-        bgMusic.play().catch(() => {});
-        musicPlaying = true;
-        musicToggle.innerHTML = '<svg viewBox="0 0 16 16"><rect x="2" y="2" width="4" height="12"/><rect x="10" y="2" width="4" height="12"/></svg>';
-        musicToggle.classList.add('playing');
-    }
 }
 
 function onPointerLockChange() {
@@ -1325,18 +1312,31 @@ function closePauseMenu() {
 // ============================
 // AUDIO SYSTEM
 // ============================
+const playSvg = '<svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 16 16"><rect x="2" y="2" width="4" height="12"/><rect x="10" y="2" width="4" height="12"/></svg>';
+
+function syncMusicButtons() {
+    const icon = musicPlaying ? pauseSvg : playSvg;
+    musicToggle.innerHTML = icon;
+    startMusicToggle.innerHTML = icon;
+    if (musicPlaying) {
+        musicToggle.classList.add('playing');
+        startMusicToggle.classList.add('playing');
+    } else {
+        musicToggle.classList.remove('playing');
+        startMusicToggle.classList.remove('playing');
+    }
+}
+
 function toggleMusic() {
     if (musicPlaying) {
         bgMusic.pause();
         musicPlaying = false;
-        musicToggle.innerHTML = '<svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>';
-        musicToggle.classList.remove('playing');
     } else {
         bgMusic.play().catch(() => {});
         musicPlaying = true;
-        musicToggle.innerHTML = '<svg viewBox="0 0 16 16"><rect x="2" y="2" width="4" height="12"/><rect x="10" y="2" width="4" height="12"/></svg>';
-        musicToggle.classList.add('playing');
     }
+    syncMusicButtons();
 }
 
 function setMusicVolume(value) {
