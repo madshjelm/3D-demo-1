@@ -338,6 +338,11 @@
     </div>
 </div>
 
+<!-- Background Music — erstat URL med din WordPress medie-URL -->
+<audio id="bg-music" loop preload="auto">
+    <source src="DIN-MUSIK-URL-HER.mp3" type="audio/mpeg">
+</audio>
+
 <!-- Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -477,8 +482,6 @@ let moveSpeed = 2.5;
 let fieldOfView = 70;
 
 // Audio
-let audioContext = null;
-let masterGain = null;
 let musicPlaying = false;
 
 // DOM elements
@@ -508,6 +511,7 @@ const fovValue = document.getElementById('fov-value');
 const musicToggle = document.getElementById('music-toggle');
 const volumeSlider = document.getElementById('volume-slider');
 const volumeValue = document.getElementById('volume-value');
+const bgMusic = document.getElementById('bg-music');
 
 init();
 
@@ -535,6 +539,9 @@ function init() {
 
     // Minimap
     minimapCtx = minimapCanvas.getContext('2d');
+
+    // Audio default volume
+    bgMusic.volume = 0.3;
 
     // Build scene
     simulateLoading(() => {
@@ -1277,124 +1284,22 @@ function closePauseMenu() {
 // ============================
 // AUDIO SYSTEM
 // ============================
-function initAudio() {
-    if (audioContext) return;
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    masterGain = audioContext.createGain();
-    masterGain.gain.value = 0.3; // default 30%
-    masterGain.connect(audioContext.destination);
-}
-
-function createAmbientDrone() {
-    // Layer 1: Deep bass drone
-    const osc1 = audioContext.createOscillator();
-    osc1.type = 'sine';
-    osc1.frequency.value = 55; // A1
-    const gain1 = audioContext.createGain();
-    gain1.gain.value = 0.3;
-
-    // Layer 2: Mid-range pad
-    const osc2 = audioContext.createOscillator();
-    osc2.type = 'sine';
-    osc2.frequency.value = 110; // A2
-    const gain2 = audioContext.createGain();
-    gain2.gain.value = 0.15;
-
-    // Layer 3: High shimmer
-    const osc3 = audioContext.createOscillator();
-    osc3.type = 'sine';
-    osc3.frequency.value = 220; // A3
-    const gain3 = audioContext.createGain();
-    gain3.gain.value = 0.05;
-
-    // Layer 4: Subtle fifth
-    const osc4 = audioContext.createOscillator();
-    osc4.type = 'sine';
-    osc4.frequency.value = 82.41; // E2
-    const gain4 = audioContext.createGain();
-    gain4.gain.value = 0.12;
-
-    // Low-pass filter for warmth
-    const filter = audioContext.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 400;
-    filter.Q.value = 1;
-
-    // Connect all oscillators through filter to master
-    osc1.connect(gain1); gain1.connect(filter);
-    osc2.connect(gain2); gain2.connect(filter);
-    osc3.connect(gain3); gain3.connect(filter);
-    osc4.connect(gain4); gain4.connect(filter);
-    filter.connect(masterGain);
-
-    // Slow LFO on filter for movement
-    const lfo = audioContext.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.05; // very slow
-    const lfoGain = audioContext.createGain();
-    lfoGain.gain.value = 150;
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
-    lfo.start();
-
-    // Slow detune LFO for organic feel
-    const lfo2 = audioContext.createOscillator();
-    lfo2.type = 'sine';
-    lfo2.frequency.value = 0.03;
-    const lfo2Gain = audioContext.createGain();
-    lfo2Gain.gain.value = 3;
-    lfo2.connect(lfo2Gain);
-    lfo2Gain.connect(osc2.detune);
-    lfo2.start();
-
-    osc1.start(); osc2.start(); osc3.start(); osc4.start();
-
-    return { oscillators: [osc1, osc2, osc3, osc4], lfo: [lfo, lfo2], gains: [gain1, gain2, gain3, gain4], filter };
-}
-
-let droneNodes = null;
-
 function toggleMusic() {
-    initAudio();
     if (musicPlaying) {
-        // Stop music with fade out
-        if (droneNodes) {
-            const now = audioContext.currentTime;
-            droneNodes.gains.forEach(g => {
-                g.gain.setTargetAtTime(0, now, 0.5);
-            });
-            setTimeout(() => {
-                droneNodes.oscillators.forEach(o => { try { o.stop(); } catch(e) {} });
-                droneNodes.lfo.forEach(o => { try { o.stop(); } catch(e) {} });
-                droneNodes = null;
-            }, 2000);
-        }
+        bgMusic.pause();
         musicPlaying = false;
-        musicToggle.innerHTML = '&#9654;'; // Play symbol
+        musicToggle.innerHTML = '&#9654;';
         musicToggle.classList.remove('playing');
     } else {
-        // Start music with fade in
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-        droneNodes = createAmbientDrone();
-        // Fade in
-        const now = audioContext.currentTime;
-        droneNodes.gains.forEach(g => {
-            const target = g.gain.value;
-            g.gain.setValueAtTime(0, now);
-            g.gain.setTargetAtTime(target, now, 1.0);
-        });
+        bgMusic.play().catch(() => {});
         musicPlaying = true;
-        musicToggle.innerHTML = '&#9646;&#9646;'; // Pause symbol
+        musicToggle.innerHTML = '&#9646;&#9646;';
         musicToggle.classList.add('playing');
     }
 }
 
 function setMusicVolume(value) {
-    if (masterGain) {
-        masterGain.gain.setTargetAtTime(value, audioContext.currentTime, 0.05);
-    }
+    bgMusic.volume = value;
 }
 
 // ============================
