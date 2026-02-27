@@ -134,6 +134,105 @@
         #info-panel::-webkit-scrollbar { width: 6px; }
         #info-panel::-webkit-scrollbar-track { background: rgba(0,20,40,0.5); }
         #info-panel::-webkit-scrollbar-thumb { background: rgba(0,180,255,0.3); border-radius: 3px; }
+
+        /* Pause Menu */
+        #pause-menu {
+            position: fixed; inset: 0; z-index: 500;
+            background: rgba(10, 14, 26, 0.92);
+            backdrop-filter: blur(8px);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.4s;
+        }
+        #pause-menu.visible { opacity: 1; pointer-events: auto; }
+
+        .pause-menu-content {
+            max-width: 480px; width: 90%; text-align: center;
+        }
+        .pause-menu-content h2 {
+            color: #00b4ff; font-size: 2.2rem; letter-spacing: 4px; margin-bottom: 2rem;
+            text-shadow: 0 0 30px rgba(0,180,255,0.5);
+        }
+
+        .resume-btn {
+            padding: 14px 48px; border: 2px solid #00b4ff; background: rgba(0,180,255,0.1);
+            color: #00e0ff; font-size: 1.1rem; border-radius: 8px; cursor: pointer;
+            transition: all 0.3s; letter-spacing: 1px; margin-bottom: 2rem;
+        }
+        .resume-btn:hover { background: rgba(0,180,255,0.25); transform: scale(1.05); }
+
+        .settings-section {
+            background: rgba(0, 20, 40, 0.5);
+            border: 1px solid rgba(0, 180, 255, 0.15);
+            border-radius: 12px; padding: 24px; margin-bottom: 1.2rem;
+            text-align: left;
+        }
+        .settings-section h3 {
+            color: #00b4ff; font-size: 0.85rem; text-transform: uppercase;
+            letter-spacing: 2px; margin-bottom: 16px;
+        }
+        .setting-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .setting-row:last-child { margin-bottom: 0; }
+        .setting-row label {
+            color: #7eb8da; font-size: 0.9rem; flex-shrink: 0; margin-right: 16px;
+        }
+        .setting-row .slider-wrap {
+            display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end;
+        }
+        .setting-row .slider-value {
+            color: #00e0ff; font-size: 0.85rem; min-width: 40px; text-align: right;
+            font-family: monospace;
+        }
+
+        /* Custom range slider */
+        input[type="range"].setting-slider {
+            -webkit-appearance: none; appearance: none;
+            width: 140px; height: 4px; border-radius: 2px;
+            background: #1a2440; outline: none; cursor: pointer;
+        }
+        input[type="range"].setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: #00b4ff; border: 2px solid #00e0ff;
+            box-shadow: 0 0 8px rgba(0,180,255,0.5);
+            cursor: pointer; transition: transform 0.15s;
+        }
+        input[type="range"].setting-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type="range"].setting-slider::-moz-range-thumb {
+            width: 16px; height: 16px; border-radius: 50%;
+            background: #00b4ff; border: 2px solid #00e0ff;
+            box-shadow: 0 0 8px rgba(0,180,255,0.5);
+            cursor: pointer;
+        }
+        input[type="range"].setting-slider::-moz-range-track {
+            height: 4px; border-radius: 2px; background: #1a2440;
+        }
+
+        .music-controls {
+            display: flex; align-items: center; gap: 12px;
+        }
+        .music-toggle {
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 1px solid rgba(0,180,255,0.4); background: rgba(0,180,255,0.1);
+            color: #00e0ff; font-size: 1rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s; flex-shrink: 0;
+        }
+        .music-toggle:hover { background: rgba(0,180,255,0.25); }
+        .music-toggle.playing { background: rgba(0,180,255,0.25); border-color: #00b4ff; }
+
+        .pause-controls-hint {
+            margin-top: 1.5rem; color: #3a6a8a; font-size: 0.8rem; line-height: 1.8;
+        }
+        .pause-controls-hint kbd {
+            display: inline-block; padding: 2px 8px; background: rgba(0,180,255,0.1);
+            border: 1px solid #1a3a5a; border-radius: 4px; color: #5a8aaa; font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -157,7 +256,7 @@
         <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> for at bevæge dig &nbsp;|&nbsp;
         <kbd>Mus</kbd> for at se dig omkring<br>
         <kbd>Klik</kbd> på stationer for at lære mere &nbsp;|&nbsp;
-        <kbd>ESC</kbd> for at frigøre musen
+        <kbd>ESC</kbd> for pause-menu
     </div>
 </div>
 
@@ -183,6 +282,60 @@
 <!-- Minimap -->
 <div id="minimap">
     <canvas id="minimap-canvas" width="150" height="150"></canvas>
+</div>
+
+<!-- Pause Menu -->
+<div id="pause-menu">
+    <div class="pause-menu-content">
+        <h2>PAUSE</h2>
+        <button class="resume-btn" id="resume-btn">Fortsæt</button>
+
+        <div class="settings-section">
+            <h3>Indstillinger</h3>
+            <div class="setting-row">
+                <label>Mus-følsomhed</label>
+                <div class="slider-wrap">
+                    <input type="range" class="setting-slider" id="sensitivity-slider" min="5" max="50" value="20" step="1">
+                    <span class="slider-value" id="sensitivity-value">20</span>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>Bevægelseshastighed</label>
+                <div class="slider-wrap">
+                    <input type="range" class="setting-slider" id="speed-slider" min="20" max="100" value="25" step="5">
+                    <span class="slider-value" id="speed-value">25</span>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>Synsfelt (FOV)</label>
+                <div class="slider-wrap">
+                    <input type="range" class="setting-slider" id="fov-slider" min="50" max="110" value="70" step="5">
+                    <span class="slider-value" id="fov-value">70°</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Musik</h3>
+            <div class="setting-row">
+                <label>Baggrundsmusik</label>
+                <div class="music-controls">
+                    <button class="music-toggle" id="music-toggle" title="Afspil/Pause musik">&#9654;</button>
+                    <div class="slider-wrap">
+                        <input type="range" class="setting-slider" id="volume-slider" min="0" max="100" value="30" step="1">
+                        <span class="slider-value" id="volume-value">30%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pause-controls-hint">
+            <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> Bevæg &nbsp;|&nbsp;
+            <kbd>Mus</kbd> Se rundt &nbsp;|&nbsp;
+            <kbd>Klik</kbd> Interager &nbsp;|&nbsp;
+            <kbd>ESC</kbd> Pause
+        </div>
+    </div>
 </div>
 
 <!-- Three.js -->
@@ -307,7 +460,7 @@ const stationData = [
 // ============================
 let camera, scene, renderer, clock;
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-let isLocked = false, panelOpen = false;
+let isLocked = false, panelOpen = false, pauseMenuOpen = false;
 let velocity = new THREE.Vector3();
 let direction = new THREE.Vector3();
 let euler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -317,6 +470,16 @@ let mouse = new THREE.Vector2(0, 0);
 let currentHovered = null;
 let playerHeight = 1.7;
 let minimapCtx;
+
+// Settings
+let mouseSensitivity = 0.002;
+let moveSpeed = 2.5;
+let fieldOfView = 70;
+
+// Audio
+let audioContext = null;
+let masterGain = null;
+let musicPlaying = false;
 
 // DOM elements
 const loadingEl = document.getElementById('loading');
@@ -332,6 +495,19 @@ const panelTitle = document.getElementById('panel-title');
 const panelContent = document.getElementById('panel-content');
 const closePanel = document.getElementById('close-panel');
 const minimapCanvas = document.getElementById('minimap-canvas');
+
+// Pause menu elements
+const pauseMenu = document.getElementById('pause-menu');
+const resumeBtn = document.getElementById('resume-btn');
+const sensitivitySlider = document.getElementById('sensitivity-slider');
+const sensitivityValue = document.getElementById('sensitivity-value');
+const speedSlider = document.getElementById('speed-slider');
+const speedValue = document.getElementById('speed-value');
+const fovSlider = document.getElementById('fov-slider');
+const fovValue = document.getElementById('fov-value');
+const musicToggle = document.getElementById('music-toggle');
+const volumeSlider = document.getElementById('volume-slider');
+const volumeValue = document.getElementById('volume-value');
 
 init();
 
@@ -376,11 +552,38 @@ function init() {
     // Events
     startBtn.addEventListener('click', startExperience);
     closePanel.addEventListener('click', closeInfoPanel);
+    resumeBtn.addEventListener('click', closePauseMenu);
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
     document.addEventListener('click', onMouseClick);
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('pointerlockchange', onPointerLockChange);
+
+    // Settings sliders
+    sensitivitySlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        mouseSensitivity = val / 10000; // 5-50 → 0.0005-0.005
+        sensitivityValue.textContent = val;
+    });
+    speedSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        moveSpeed = val / 10; // 20-100 → 2.0-10.0
+        speedValue.textContent = val;
+    });
+    fovSlider.addEventListener('input', (e) => {
+        fieldOfView = parseInt(e.target.value);
+        fovValue.textContent = fieldOfView + '°';
+        if (camera) {
+            camera.fov = fieldOfView;
+            camera.updateProjectionMatrix();
+        }
+    });
+    musicToggle.addEventListener('click', toggleMusic);
+    volumeSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        volumeValue.textContent = val + '%';
+        setMusicVolume(val / 100);
+    });
     window.addEventListener('resize', onResize);
 
     // Start render loop
@@ -952,29 +1155,39 @@ function startExperience() {
 
 function onPointerLockChange() {
     isLocked = document.pointerLockElement === document.body;
-    if (!isLocked && !panelOpen) {
-        crosshairEl.classList.remove('visible');
-        hudEl.classList.add('hidden');
-    } else if (isLocked) {
+    if (!isLocked) {
+        if (!panelOpen && !pauseMenuOpen && startOverlay.classList.contains('hidden')) {
+            // Pointer lock released while game is active → show pause menu
+            openPauseMenu();
+        } else if (!panelOpen && !pauseMenuOpen) {
+            crosshairEl.classList.remove('visible');
+            hudEl.classList.add('hidden');
+        }
+    } else {
         crosshairEl.classList.add('visible');
         hudEl.classList.remove('hidden');
     }
 }
 
 function onMouseMove(e) {
-    if (!isLocked || panelOpen) return;
+    if (!isLocked || panelOpen || pauseMenuOpen) return;
 
-    const sensitivity = 0.002;
     euler.setFromQuaternion(camera.quaternion);
-    euler.y -= e.movementX * sensitivity;
-    euler.x -= e.movementY * sensitivity;
+    euler.y -= e.movementX * mouseSensitivity;
+    euler.x -= e.movementY * mouseSensitivity;
     euler.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, euler.x));
     camera.quaternion.setFromEuler(euler);
 }
 
 function onKeyDown(e) {
-    if (panelOpen && e.code === 'Escape') {
-        closeInfoPanel();
+    if (e.code === 'Escape') {
+        if (panelOpen) {
+            closeInfoPanel();
+        } else if (pauseMenuOpen) {
+            closePauseMenu();
+        }
+        // Note: if locked in game, browser auto-releases pointer lock on ESC,
+        // which triggers onPointerLockChange → openPauseMenu
         return;
     }
     switch (e.code) {
@@ -996,13 +1209,13 @@ function onKeyUp(e) {
 
 function onMouseClick() {
     if (!isLocked) {
-        if (!panelOpen && !startOverlay.classList.contains('hidden') === false) {
+        if (!panelOpen && !pauseMenuOpen && startOverlay.classList.contains('hidden')) {
             document.body.requestPointerLock();
         }
         return;
     }
 
-    if (panelOpen) return;
+    if (panelOpen || pauseMenuOpen) return;
 
     if (currentHovered) {
         openInfoPanel(currentHovered);
@@ -1035,6 +1248,153 @@ function closeInfoPanel() {
     setTimeout(() => {
         document.body.requestPointerLock();
     }, 100);
+}
+
+// ============================
+// PAUSE MENU
+// ============================
+function openPauseMenu() {
+    pauseMenuOpen = true;
+    pauseMenu.classList.add('visible');
+    // Reset movement
+    moveForward = moveBackward = moveLeft = moveRight = false;
+    crosshairEl.classList.remove('visible');
+    interactPrompt.classList.remove('visible');
+    hudEl.classList.add('hidden');
+    if (document.pointerLockElement) {
+        document.exitPointerLock();
+    }
+}
+
+function closePauseMenu() {
+    pauseMenuOpen = false;
+    pauseMenu.classList.remove('visible');
+    setTimeout(() => {
+        document.body.requestPointerLock();
+    }, 100);
+}
+
+// ============================
+// AUDIO SYSTEM
+// ============================
+function initAudio() {
+    if (audioContext) return;
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioContext.createGain();
+    masterGain.gain.value = 0.3; // default 30%
+    masterGain.connect(audioContext.destination);
+}
+
+function createAmbientDrone() {
+    // Layer 1: Deep bass drone
+    const osc1 = audioContext.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = 55; // A1
+    const gain1 = audioContext.createGain();
+    gain1.gain.value = 0.3;
+
+    // Layer 2: Mid-range pad
+    const osc2 = audioContext.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = 110; // A2
+    const gain2 = audioContext.createGain();
+    gain2.gain.value = 0.15;
+
+    // Layer 3: High shimmer
+    const osc3 = audioContext.createOscillator();
+    osc3.type = 'sine';
+    osc3.frequency.value = 220; // A3
+    const gain3 = audioContext.createGain();
+    gain3.gain.value = 0.05;
+
+    // Layer 4: Subtle fifth
+    const osc4 = audioContext.createOscillator();
+    osc4.type = 'sine';
+    osc4.frequency.value = 82.41; // E2
+    const gain4 = audioContext.createGain();
+    gain4.gain.value = 0.12;
+
+    // Low-pass filter for warmth
+    const filter = audioContext.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 400;
+    filter.Q.value = 1;
+
+    // Connect all oscillators through filter to master
+    osc1.connect(gain1); gain1.connect(filter);
+    osc2.connect(gain2); gain2.connect(filter);
+    osc3.connect(gain3); gain3.connect(filter);
+    osc4.connect(gain4); gain4.connect(filter);
+    filter.connect(masterGain);
+
+    // Slow LFO on filter for movement
+    const lfo = audioContext.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.05; // very slow
+    const lfoGain = audioContext.createGain();
+    lfoGain.gain.value = 150;
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+    lfo.start();
+
+    // Slow detune LFO for organic feel
+    const lfo2 = audioContext.createOscillator();
+    lfo2.type = 'sine';
+    lfo2.frequency.value = 0.03;
+    const lfo2Gain = audioContext.createGain();
+    lfo2Gain.gain.value = 3;
+    lfo2.connect(lfo2Gain);
+    lfo2Gain.connect(osc2.detune);
+    lfo2.start();
+
+    osc1.start(); osc2.start(); osc3.start(); osc4.start();
+
+    return { oscillators: [osc1, osc2, osc3, osc4], lfo: [lfo, lfo2], gains: [gain1, gain2, gain3, gain4], filter };
+}
+
+let droneNodes = null;
+
+function toggleMusic() {
+    initAudio();
+    if (musicPlaying) {
+        // Stop music with fade out
+        if (droneNodes) {
+            const now = audioContext.currentTime;
+            droneNodes.gains.forEach(g => {
+                g.gain.setTargetAtTime(0, now, 0.5);
+            });
+            setTimeout(() => {
+                droneNodes.oscillators.forEach(o => { try { o.stop(); } catch(e) {} });
+                droneNodes.lfo.forEach(o => { try { o.stop(); } catch(e) {} });
+                droneNodes = null;
+            }, 2000);
+        }
+        musicPlaying = false;
+        musicToggle.innerHTML = '&#9654;'; // Play symbol
+        musicToggle.classList.remove('playing');
+    } else {
+        // Start music with fade in
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        droneNodes = createAmbientDrone();
+        // Fade in
+        const now = audioContext.currentTime;
+        droneNodes.gains.forEach(g => {
+            const target = g.gain.value;
+            g.gain.setValueAtTime(0, now);
+            g.gain.setTargetAtTime(target, now, 1.0);
+        });
+        musicPlaying = true;
+        musicToggle.innerHTML = '&#9646;&#9646;'; // Pause symbol
+        musicToggle.classList.add('playing');
+    }
+}
+
+function setMusicVolume(value) {
+    if (masterGain) {
+        masterGain.gain.setTargetAtTime(value, audioContext.currentTime, 0.05);
+    }
 }
 
 // ============================
@@ -1103,7 +1463,7 @@ function animate() {
     const time = clock.getElapsedTime();
 
     // Movement
-    if (isLocked && !panelOpen) {
+    if (isLocked && !panelOpen && !pauseMenuOpen) {
         velocity.x -= velocity.x * 8.0 * delta;
         velocity.z -= velocity.z * 8.0 * delta;
 
@@ -1111,9 +1471,8 @@ function animate() {
         direction.x = Number(moveRight) - Number(moveLeft);
         direction.normalize();
 
-        const speed = 2.5;
-        if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+        if (moveForward || moveBackward) velocity.z -= direction.z * moveSpeed * delta;
+        if (moveLeft || moveRight) velocity.x -= direction.x * moveSpeed * delta;
 
         // Apply movement relative to camera direction
         const forward = new THREE.Vector3(0, 0, -1);
@@ -1140,7 +1499,7 @@ function animate() {
     }
 
     // Raycasting for interaction
-    if (isLocked && !panelOpen) {
+    if (isLocked && !panelOpen && !pauseMenuOpen) {
         raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
 
         let found = null;
