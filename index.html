@@ -1266,8 +1266,7 @@ function addDecorations() {
     scene.add(particles);
 
     // Momentum AI logo on wall (back wall)
-    const logoTexture = new THREE.TextureLoader().load('Momentum logo.png');
-    logoTexture.colorSpace = THREE.SRGBColorSpace;
+    const logoTexture = new THREE.TextureLoader().load('https://momentum-ai.dk/wp-content/uploads/2025/02/cropped-ny-footer.png');
     const logoSize = 1.4;
     const logoGeo = new THREE.PlaneGeometry(logoSize, logoSize);
     const logoMat = new THREE.MeshBasicMaterial({ map: logoTexture, transparent: true });
