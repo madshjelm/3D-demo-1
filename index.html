@@ -1266,10 +1266,17 @@ function addDecorations() {
     scene.add(particles);
 
     // Momentum AI logo on wall (back wall)
-    addWallText('MOMENTUM AI', 0, 3.2, -11.9, 0.6, '#00b4ff');
+    const logoTexture = new THREE.TextureLoader().load('Momentum logo.png');
+    logoTexture.colorSpace = THREE.SRGBColorSpace;
+    const logoSize = 1.4;
+    const logoGeo = new THREE.PlaneGeometry(logoSize, logoSize);
+    const logoMat = new THREE.MeshBasicMaterial({ map: logoTexture, transparent: true });
+    const logoMesh = new THREE.Mesh(logoGeo, logoMat);
+    logoMesh.position.set(0, 3.95, -11.85);
+    scene.add(logoMesh);
 
     // "Workshop" sub-text
-    addWallText('Book en interaktiv workshop til din virksomhed', 0, 0.35, -11.9, 0.18, '#2a5a7a');
+    addWallText('Book en interaktiv workshop til din virksomhed', 0, 0.6, -11.9, 0.18, '#2a5a7a');
 
     // Side wall decorative text
     addWallText('INNOVATION', -11.9, 3.2, 0, 0.4, '#0a3050', Math.PI / 2);
