@@ -497,6 +497,72 @@ let mouseSensitivity = 0.002;
 let moveSpeed = 0.5;
 let fieldOfView = 70;
 
+// Collision data
+const PLAYER_RADIUS = 0.3;
+const colliders = [
+    // Central conference table + chairs cluster
+    { type: 'box', x: 0, z: 0, hw: 2.8, hd: 1.8 },
+    // Side tables
+    { type: 'box', x: -8, z: -2, hw: 1.2, hd: 0.7 },
+    { type: 'box', x: -8, z:  2, hw: 1.2, hd: 0.7 },
+    { type: 'box', x:  8, z: -2, hw: 1.2, hd: 0.7 },
+    { type: 'box', x:  8, z:  2, hw: 1.2, hd: 0.7 },
+    // Plants
+    { type: 'circle', x: -10, z: -10, r: 0.45 },
+    { type: 'circle', x:  10, z: -10, r: 0.45 },
+    { type: 'circle', x: -10, z:  10, r: 0.45 },
+    { type: 'circle', x:  10, z:  10, r: 0.45 },
+    // Stations
+    { type: 'circle', x: -8, z: -6, r: 0.6 },
+    { type: 'circle', x:  8, z: -6, r: 0.6 },
+    { type: 'circle', x: -8, z:  6, r: 0.6 },
+    { type: 'circle', x:  8, z:  6, r: 0.6 },
+    { type: 'circle', x:  0, z: -8, r: 0.6 },
+    { type: 'circle', x:  0, z:  8, r: 0.6 },
+];
+
+function resolveCollisions(pos) {
+    for (let i = 0; i < colliders.length; i++) {
+        const c = colliders[i];
+        if (c.type === 'box') {
+            const nearestX = Math.max(c.x - c.hw, Math.min(pos.x, c.x + c.hw));
+            const nearestZ = Math.max(c.z - c.hd, Math.min(pos.z, c.z + c.hd));
+            const dx = pos.x - nearestX;
+            const dz = pos.z - nearestZ;
+            const distSq = dx * dx + dz * dz;
+            if (distSq < PLAYER_RADIUS * PLAYER_RADIUS) {
+                if (distSq === 0) {
+                    const pushL = pos.x - (c.x - c.hw);
+                    const pushR = (c.x + c.hw) - pos.x;
+                    const pushT = pos.z - (c.z - c.hd);
+                    const pushB = (c.z + c.hd) - pos.z;
+                    const minPush = Math.min(pushL, pushR, pushT, pushB);
+                    if (minPush === pushL) pos.x = c.x - c.hw - PLAYER_RADIUS;
+                    else if (minPush === pushR) pos.x = c.x + c.hw + PLAYER_RADIUS;
+                    else if (minPush === pushT) pos.z = c.z - c.hd - PLAYER_RADIUS;
+                    else pos.z = c.z + c.hd + PLAYER_RADIUS;
+                } else {
+                    const dist = Math.sqrt(distSq);
+                    const overlap = PLAYER_RADIUS - dist;
+                    pos.x += (dx / dist) * overlap;
+                    pos.z += (dz / dist) * overlap;
+                }
+            }
+        } else {
+            const dx = pos.x - c.x;
+            const dz = pos.z - c.z;
+            const distSq = dx * dx + dz * dz;
+            const minDist = PLAYER_RADIUS + c.r;
+            if (distSq < minDist * minDist && distSq > 0) {
+                const dist = Math.sqrt(distSq);
+                const overlap = minDist - dist;
+                pos.x += (dx / dist) * overlap;
+                pos.z += (dz / dist) * overlap;
+            }
+        }
+    }
+}
+
 // Audio
 let musicPlaying = false;
 
@@ -1493,6 +1559,9 @@ function animate() {
         move.addScaledVector(right, -velocity.x);
 
         camera.position.add(move);
+
+        // Object collisions
+        resolveCollisions(camera.position);
 
         // Boundary collision
         const bound = 11;
