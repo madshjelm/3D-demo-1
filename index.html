@@ -924,11 +924,11 @@ function createWhiteboard(x, y, z) {
     ctx.fillStyle = '#00b4ff';
     ctx.font = 'bold 48px Segoe UI, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Generativ AI Workshop', 370, 100);
+    ctx.fillText('Generativ AI Workshop', 370, 130);
     ctx.fillStyle = '#5a8aaa';
     ctx.font = '28px Segoe UI, system-ui, sans-serif';
-    ctx.fillText('Momentum AI', 370, 160);
-    ctx.fillText('Virtuelt træningsmiljø', 370, 200);
+    ctx.fillText('Momentum AI', 370, 190);
+    ctx.fillText('Virtuelt træningsmiljø', 370, 230);
     ctx.strokeStyle = '#00b4ff22';
     ctx.lineWidth = 1;
     for (let i = 0; i < 740; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 340); ctx.stroke(); }
@@ -1267,11 +1267,11 @@ function addDecorations() {
 
     // Momentum AI logo on wall (back wall)
     const logoTexture = new THREE.TextureLoader().load('https://momentum-ai.dk/wp-content/uploads/2025/02/cropped-ny-footer.png');
-    const logoSize = 1.4;
+    const logoSize = 0.42;
     const logoGeo = new THREE.PlaneGeometry(logoSize, logoSize);
     const logoMat = new THREE.MeshBasicMaterial({ map: logoTexture, transparent: true });
     const logoMesh = new THREE.Mesh(logoGeo, logoMat);
-    logoMesh.position.set(0, 3.95, -11.85);
+    logoMesh.position.set(0, 3.6, -11.85);
     scene.add(logoMesh);
 
     // "Workshop" sub-text
