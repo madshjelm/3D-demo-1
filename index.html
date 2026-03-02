@@ -317,7 +317,7 @@
             <div class="setting-row">
                 <label>Bevægelseshastighed</label>
                 <div class="slider-wrap">
-                    <input type="range" class="setting-slider" id="speed-slider" min="20" max="100" value="25" step="5">
+                    <input type="range" class="setting-slider" id="speed-slider" min="15" max="35" value="25" step="5">
                     <span class="slider-value" id="speed-value">25</span>
                 </div>
             </div>
@@ -493,7 +493,7 @@ let starfieldGroup;
 
 // Settings
 let mouseSensitivity = 0.002;
-let moveSpeed = 18;
+let moveSpeed = 25;
 let fieldOfView = 70;
 
 // Collision data
@@ -659,7 +659,7 @@ function init() {
     });
     speedSlider.addEventListener('input', (e) => {
         const val = parseInt(e.target.value);
-        moveSpeed = val * 6; // 20-100 → 120-600
+        moveSpeed = val; // 15-35 → direct
         speedValue.textContent = val;
     });
     fovSlider.addEventListener('input', (e) => {
