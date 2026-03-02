@@ -493,7 +493,7 @@ let starfieldGroup;
 
 // Settings
 let mouseSensitivity = 0.002;
-let moveSpeed = 0.3;
+let moveSpeed = 18;
 let fieldOfView = 70;
 
 // Collision data
@@ -659,7 +659,7 @@ function init() {
     });
     speedSlider.addEventListener('input', (e) => {
         const val = parseInt(e.target.value);
-        moveSpeed = val / 10; // 20-100 → 2.0-10.0
+        moveSpeed = val * 6; // 20-100 → 120-600
         speedValue.textContent = val;
     });
     fovSlider.addEventListener('input', (e) => {
@@ -1533,13 +1533,14 @@ function drawMinimap() {
 function animate() {
     requestAnimationFrame(animate);
 
-    const delta = clock.getDelta();
+    const delta = Math.min(clock.getDelta(), 0.1);
     const time = clock.getElapsedTime();
 
     // Movement
     if (isLocked && !panelOpen && !pauseMenuOpen) {
-        velocity.x -= velocity.x * 8.0 * delta;
-        velocity.z -= velocity.z * 8.0 * delta;
+        const friction = Math.exp(-8.0 * delta);
+        velocity.x *= friction;
+        velocity.z *= friction;
 
         direction.z = Number(moveForward) - Number(moveBackward);
         direction.x = Number(moveRight) - Number(moveLeft);
@@ -1560,8 +1561,8 @@ function animate() {
         right.normalize();
 
         const move = new THREE.Vector3();
-        move.addScaledVector(forward, -velocity.z);
-        move.addScaledVector(right, -velocity.x);
+        move.addScaledVector(forward, -velocity.z * delta);
+        move.addScaledVector(right, -velocity.x * delta);
 
         camera.position.add(move);
 
