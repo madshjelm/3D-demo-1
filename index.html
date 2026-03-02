@@ -953,16 +953,26 @@ function createLaptop(x, y, z, rotY = 0) {
 
     // Tablet body (flat, lying face-up on the table)
     const baseGeo = new THREE.BoxGeometry(0.35, 0.02, 0.25);
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.8, roughness: 0.2 });
-    group.add(new THREE.Mesh(baseGeo, baseMat));
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3e, metalness: 0.8, roughness: 0.2 });
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    baseMesh.castShadow = true;
+    baseMesh.receiveShadow = true;
+    group.add(baseMesh);
 
     // Screen surface facing upward
     const glowGeo = new THREE.PlaneGeometry(0.30, 0.20);
-    const glowMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.35 });
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.6 });
     const glow = new THREE.Mesh(glowGeo, glowMat);
     glow.position.set(0, 0.011, 0);
     glow.rotation.x = -Math.PI / 2;
     group.add(glow);
+
+    // Edge bezel glow
+    const bezelGeo = new THREE.BoxGeometry(0.36, 0.005, 0.26);
+    const bezelMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.2 });
+    const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+    bezel.position.set(0, 0.01, 0);
+    group.add(bezel);
 
     group.position.set(x, y, z);
     group.rotation.y = rotY;
