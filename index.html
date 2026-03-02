@@ -951,17 +951,25 @@ function createWhiteboard(x, y, z) {
 function createLaptop(x, y, z, rotY = 0) {
     const group = new THREE.Group();
 
-    // Tablet body (flat, lying face-up on the table)
+    // Base
     const baseGeo = new THREE.BoxGeometry(0.35, 0.02, 0.25);
     const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.8, roughness: 0.2 });
     group.add(new THREE.Mesh(baseGeo, baseMat));
 
-    // Screen surface facing upward
-    const glowGeo = new THREE.PlaneGeometry(0.30, 0.20);
-    const glowMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.35 });
+    // Screen
+    const screenGeo = new THREE.BoxGeometry(0.34, 0.22, 0.01);
+    const screenMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.8, roughness: 0.2 });
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.position.set(0, 0.12, -0.12);
+    screenMesh.rotation.x = 0.3;
+    group.add(screenMesh);
+
+    // Screen glow
+    const glowGeo = new THREE.PlaneGeometry(0.3, 0.18);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.3 });
     const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.position.set(0, 0.011, 0);
-    glow.rotation.x = -Math.PI / 2;
+    glow.position.set(0, 0.12, -0.115);
+    glow.rotation.x = 0.3;
     group.add(glow);
 
     group.position.set(x, y, z);
