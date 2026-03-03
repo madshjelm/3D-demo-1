@@ -490,11 +490,25 @@ let currentHovered = null;
 let playerHeight = 1.7;
 let minimapCtx;
 let starfieldGroup;
+let indicatorMeshes = [];
+let particleMesh = null;
 
 // Settings
 let mouseSensitivity = 0.002;
 let moveSpeed = 25;
 let fieldOfView = 70;
+
+// Pre-allocated reusable vectors for animation loop (avoids per-frame allocations)
+const _rayOrigin = new THREE.Vector2(0, 0);
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _move = new THREE.Vector3();
+const _minimapDir = new THREE.Vector3();
+
+// Starfield twinkling constants (hoisted out of animation loop)
+const twinkleSpeeds = [0.7, 0.5, 0.3];
+const twinkleOffsets = [0, 1.0, 2.0];
+const twinkleAmplitudes = [0.08, 0.10, 0.10];
 
 // Collision data
 const PLAYER_RADIUS = 0.3;
@@ -732,8 +746,8 @@ function buildRoom() {
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
-    // Dark backdrop dome (large radius for sky depth illusion)
-    const domeGeo = new THREE.SphereGeometry(80, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    // Dark backdrop dome (reduced segments — distant, uniform-color backdrop)
+    const domeGeo = new THREE.SphereGeometry(80, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2);
     const domeMat = new THREE.MeshBasicMaterial({
         color: 0x030610,
         side: THREE.BackSide,
@@ -834,11 +848,16 @@ function buildFurniture() {
     createPlant(10, 0, 10);
 }
 
+// Shared table leg geometry and materials (5 tables x 4 legs = 20 meshes reuse these)
+const tableLegGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.74);
+const tableLegMat = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, metalness: 0.8, roughness: 0.3 });
+const tableTopMat = new THREE.MeshStandardMaterial({ color: 0x1a2535, roughness: 0.4, metalness: 0.3 });
+const tableEdgeMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.15 });
+
 function createTable(x, y, z, width, depth) {
     // Tabletop
     const topGeo = new THREE.BoxGeometry(width, 0.05, depth);
-    const topMat = new THREE.MeshStandardMaterial({ color: 0x1a2535, roughness: 0.4, metalness: 0.3 });
-    const top = new THREE.Mesh(topGeo, topMat);
+    const top = new THREE.Mesh(topGeo, tableTopMat);
     top.position.set(x, 0.75, z);
     top.castShadow = true;
     top.receiveShadow = true;
@@ -846,14 +865,11 @@ function createTable(x, y, z, width, depth) {
 
     // Edge glow
     const edgeGeo = new THREE.BoxGeometry(width + 0.04, 0.02, depth + 0.04);
-    const edgeMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.15 });
-    const edge = new THREE.Mesh(edgeGeo, edgeMat);
+    const edge = new THREE.Mesh(edgeGeo, tableEdgeMat);
     edge.position.set(x, 0.75, z);
     scene.add(edge);
 
-    // Legs
-    const legGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.74);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, metalness: 0.8, roughness: 0.3 });
+    // Legs (shared geometry and material)
     const offsets = [
         { dx: -width / 2 + 0.15, dz: -depth / 2 + 0.15 },
         { dx: width / 2 - 0.15, dz: -depth / 2 + 0.15 },
@@ -861,34 +877,36 @@ function createTable(x, y, z, width, depth) {
         { dx: width / 2 - 0.15, dz: depth / 2 - 0.15 }
     ];
     offsets.forEach(o => {
-        const leg = new THREE.Mesh(legGeo, legMat);
+        const leg = new THREE.Mesh(tableLegGeo, tableLegMat);
         leg.position.set(x + o.dx, 0.37, z + o.dz);
         leg.castShadow = true;
         scene.add(leg);
     });
 }
 
+// Shared chair geometries and materials (8 chairs reuse these)
+const chairSeatGeo = new THREE.BoxGeometry(0.45, 0.05, 0.45);
+const chairBackGeo = new THREE.BoxGeometry(0.45, 0.5, 0.05);
+const chairSeatMat = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.6 });
+const chairLegGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.44);
+const chairLegMat = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, metalness: 0.7 });
+
 function createChair(x, z, rotY) {
     const group = new THREE.Group();
 
     // Seat
-    const seatGeo = new THREE.BoxGeometry(0.45, 0.05, 0.45);
-    const seatMat = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.6 });
-    const seat = new THREE.Mesh(seatGeo, seatMat);
+    const seat = new THREE.Mesh(chairSeatGeo, chairSeatMat);
     seat.position.y = 0.45;
     group.add(seat);
 
     // Back
-    const backGeo = new THREE.BoxGeometry(0.45, 0.5, 0.05);
-    const back = new THREE.Mesh(backGeo, seatMat);
+    const back = new THREE.Mesh(chairBackGeo, chairSeatMat);
     back.position.set(0, 0.72, -0.2);
     group.add(back);
 
     // Legs
-    const legGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.44);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, metalness: 0.7 });
     [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]].forEach(([lx, lz]) => {
-        const leg = new THREE.Mesh(legGeo, legMat);
+        const leg = new THREE.Mesh(chairLegGeo, chairLegMat);
         leg.position.set(lx, 0.22, lz);
         group.add(leg);
     });
@@ -948,29 +966,31 @@ function createWhiteboard(x, y, z) {
     scene.add(frame);
 }
 
+// Shared laptop/tablet geometries and materials (3 tablets reuse these)
+const laptopBaseGeo = new THREE.BoxGeometry(0.5, 0.02, 0.35);
+const laptopBaseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3e, metalness: 0.8, roughness: 0.2 });
+const laptopGlowGeo = new THREE.PlaneGeometry(0.44, 0.29);
+const laptopGlowMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.6 });
+const laptopBezelGeo = new THREE.BoxGeometry(0.52, 0.005, 0.37);
+const laptopBezelMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.25 });
+
 function createLaptop(x, y, z, rotY = 0) {
     const group = new THREE.Group();
 
-    // Tablet body (flat, lying face-up on the table)
-    const baseGeo = new THREE.BoxGeometry(0.5, 0.02, 0.35);
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3e, metalness: 0.8, roughness: 0.2 });
-    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    // Tablet body (shared geometry and material)
+    const baseMesh = new THREE.Mesh(laptopBaseGeo, laptopBaseMat);
     baseMesh.castShadow = true;
     baseMesh.receiveShadow = true;
     group.add(baseMesh);
 
-    // Screen surface facing upward
-    const glowGeo = new THREE.PlaneGeometry(0.44, 0.29);
-    const glowMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.6 });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
+    // Screen surface facing upward (shared)
+    const glow = new THREE.Mesh(laptopGlowGeo, laptopGlowMat);
     glow.position.set(0, 0.011, 0);
     glow.rotation.x = -Math.PI / 2;
     group.add(glow);
 
-    // Edge bezel glow
-    const bezelGeo = new THREE.BoxGeometry(0.52, 0.005, 0.37);
-    const bezelMat = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.25 });
-    const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+    // Edge bezel glow (shared)
+    const bezel = new THREE.Mesh(laptopBezelGeo, laptopBezelMat);
     bezel.position.set(0, 0.01, 0);
     group.add(bezel);
 
@@ -979,28 +999,32 @@ function createLaptop(x, y, z, rotY = 0) {
     scene.add(group);
 }
 
+// Shared coffee cup geometry and material (2 cups reuse these)
+const coffeeCupGeo = new THREE.CylinderGeometry(0.035, 0.03, 0.08, 12);
+const coffeeCupMat = new THREE.MeshStandardMaterial({ color: 0x2a3040, roughness: 0.4 });
+
 function createCoffeeCup(x, y, z) {
-    const cupGeo = new THREE.CylinderGeometry(0.035, 0.03, 0.08, 12);
-    const cupMat = new THREE.MeshStandardMaterial({ color: 0x2a3040, roughness: 0.4 });
-    const cup = new THREE.Mesh(cupGeo, cupMat);
+    const cup = new THREE.Mesh(coffeeCupGeo, coffeeCupMat);
     cup.position.set(x, y + 0.04, z);
     scene.add(cup);
 }
 
+// Shared plant geometry and materials (4 plants reuse these)
+const plantPotGeo = new THREE.CylinderGeometry(0.25, 0.2, 0.4, 8);
+const plantPotMat = new THREE.MeshStandardMaterial({ color: 0x1a2535, roughness: 0.7 });
+const plantLeafMat = new THREE.MeshStandardMaterial({ color: 0x0a3a2a, roughness: 0.8 });
+
 function createPlant(x, y, z) {
-    // Pot
-    const potGeo = new THREE.CylinderGeometry(0.25, 0.2, 0.4, 8);
-    const potMat = new THREE.MeshStandardMaterial({ color: 0x1a2535, roughness: 0.7 });
-    const pot = new THREE.Mesh(potGeo, potMat);
+    // Pot (shared geometry and material)
+    const pot = new THREE.Mesh(plantPotGeo, plantPotMat);
     pot.position.set(x, 0.2, z);
     pot.castShadow = true;
     scene.add(pot);
 
-    // Plant "leaves" as a sphere cluster
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x0a3a2a, roughness: 0.8 });
+    // Plant "leaves" as a sphere cluster (shared material)
     for (let i = 0; i < 5; i++) {
         const leafGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 8, 6);
-        const leaf = new THREE.Mesh(leafGeo, leafMat);
+        const leaf = new THREE.Mesh(leafGeo, plantLeafMat);
         leaf.position.set(
             x + (Math.random() - 0.5) * 0.2,
             0.5 + Math.random() * 0.3,
@@ -1097,8 +1121,8 @@ function buildStations() {
         screen.position.set(0, 0.6, 0.09);
         group.add(screen);
 
-        // Glow ring at base
-        const ringGeo = new THREE.RingGeometry(0.5, 0.55, 32);
+        // Glow ring at base (reduced segments — small ring viewed from above)
+        const ringGeo = new THREE.RingGeometry(0.5, 0.55, 16);
         const ringMat = new THREE.MeshBasicMaterial({
             color: station.color,
             transparent: true,
@@ -1110,8 +1134,8 @@ function buildStations() {
         ring.position.y = 0.02;
         group.add(ring);
 
-        // Floating indicator above
-        const indicatorGeo = new THREE.SphereGeometry(0.08, 16, 12);
+        // Floating indicator above (reduced segments — tiny sphere at r=0.08)
+        const indicatorGeo = new THREE.SphereGeometry(0.08, 8, 6);
         const indicatorMat = new THREE.MeshBasicMaterial({
             color: station.color,
             transparent: true,
@@ -1121,6 +1145,7 @@ function buildStations() {
         indicator.position.y = 1.5;
         indicator.userData.isIndicator = true;
         group.add(indicator);
+        indicatorMeshes.push(indicator);
 
         // Point light for station
         const stationLight = new THREE.PointLight(station.color, 0.5, 4);
@@ -1264,6 +1289,7 @@ function addDecorations() {
     });
     const particles = new THREE.Points(particleGeo, particleMat);
     particles.userData.isParticles = true;
+    particleMesh = particles;
     scene.add(particles);
 
     // Momentum AI logo on wall (back wall)
@@ -1518,14 +1544,14 @@ function drawMinimap() {
     ctx.arc(px, py, 4, 0, Math.PI * 2);
     ctx.fill();
 
-    // Player direction
-    const dir = new THREE.Vector3(0, 0, -1);
-    dir.applyQuaternion(camera.quaternion);
+    // Player direction (reusing pre-allocated vector)
+    _minimapDir.set(0, 0, -1);
+    _minimapDir.applyQuaternion(camera.quaternion);
     ctx.strokeStyle = '#00e0ff';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(px, py);
-    ctx.lineTo(px + dir.x * 10, py + dir.z * 10);
+    ctx.lineTo(px + _minimapDir.x * 10, py + _minimapDir.z * 10);
     ctx.stroke();
 }
 
@@ -1551,22 +1577,22 @@ function animate() {
         if (moveForward || moveBackward) velocity.z -= direction.z * moveSpeed * delta;
         if (moveLeft || moveRight) velocity.x -= direction.x * moveSpeed * delta;
 
-        // Apply movement relative to camera direction
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(camera.quaternion);
-        forward.y = 0;
-        forward.normalize();
+        // Apply movement relative to camera direction (reusing pre-allocated vectors)
+        _forward.set(0, 0, -1);
+        _forward.applyQuaternion(camera.quaternion);
+        _forward.y = 0;
+        _forward.normalize();
 
-        const right = new THREE.Vector3(1, 0, 0);
-        right.applyQuaternion(camera.quaternion);
-        right.y = 0;
-        right.normalize();
+        _right.set(1, 0, 0);
+        _right.applyQuaternion(camera.quaternion);
+        _right.y = 0;
+        _right.normalize();
 
-        const move = new THREE.Vector3();
-        move.addScaledVector(forward, -velocity.z * delta);
-        move.addScaledVector(right, -velocity.x * delta);
+        _move.set(0, 0, 0);
+        _move.addScaledVector(_forward, -velocity.z * delta);
+        _move.addScaledVector(_right, -velocity.x * delta);
 
-        camera.position.add(move);
+        camera.position.add(_move);
 
         // Object collisions
         resolveCollisions(camera.position);
@@ -1580,7 +1606,7 @@ function animate() {
 
     // Raycasting for interaction
     if (isLocked && !panelOpen && !pauseMenuOpen) {
-        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        raycaster.setFromCamera(_rayOrigin, camera);
 
         let found = null;
         for (const obj of interactiveObjects) {
@@ -1603,41 +1629,37 @@ function animate() {
         }
     }
 
-    // Animate floating indicators
-    scene.traverse(child => {
-        if (child.userData.isIndicator) {
-            child.position.y = 1.5 + Math.sin(time * 2 + child.parent.position.x) * 0.1;
-        }
-    });
+    // Animate floating indicators (cached references)
+    for (let i = 0; i < indicatorMeshes.length; i++) {
+        const ind = indicatorMeshes[i];
+        ind.position.y = 1.5 + Math.sin(time * 2 + ind.parent.position.x) * 0.1;
+    }
 
-    // Animate particles
-    scene.traverse(child => {
-        if (child.userData.isParticles) {
-            const positions = child.geometry.attributes.position.array;
-            for (let i = 0; i < positions.length; i += 3) {
-                positions[i + 1] += Math.sin(time + positions[i] * 0.5) * 0.001;
-                if (positions[i + 1] > 3.8) positions[i + 1] = 0.3;
-                if (positions[i + 1] < 0.2) positions[i + 1] = 3.8;
-            }
-            child.geometry.attributes.position.needsUpdate = true;
+    // Animate particles (cached reference)
+    if (particleMesh) {
+        const positions = particleMesh.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            positions[i + 1] += Math.sin(time + positions[i] * 0.5) * 0.001;
+            if (positions[i + 1] > 3.8) positions[i + 1] = 0.3;
+            if (positions[i + 1] < 0.2) positions[i + 1] = 3.8;
         }
-    });
+        particleMesh.geometry.attributes.position.needsUpdate = true;
+    }
 
     // Animate 3D starfield (slow rotation + layer opacity breathing)
     if (starfieldGroup) {
         starfieldGroup.rotation.y += delta * 0.003;
-        const twinkleSpeeds = [0.7, 0.5, 0.3];
-        const twinkleOffsets = [0, 1.0, 2.0];
-        const twinkleAmplitudes = [0.08, 0.10, 0.10];
-        starfieldGroup.children.forEach(layer => {
-            const idx = layer.userData.starLayer;
-            const base = layer.userData.baseOpacity;
-            layer.material.opacity = base + twinkleAmplitudes[idx] * Math.sin(time * twinkleSpeeds[idx] + twinkleOffsets[idx]);
-        });
+        const layers = starfieldGroup.children;
+        for (let i = 0; i < layers.length; i++) {
+            const layer = layers[i];
+            layer.material.opacity = layer.userData.baseOpacity + twinkleAmplitudes[i] * Math.sin(time * twinkleSpeeds[i] + twinkleOffsets[i]);
+        }
     }
 
-    // Draw minimap
-    drawMinimap();
+    // Draw minimap (skip when paused or panel open — nothing moves)
+    if (isLocked && !panelOpen && !pauseMenuOpen) {
+        drawMinimap();
+    }
 
     renderer.render(scene, camera);
 }
